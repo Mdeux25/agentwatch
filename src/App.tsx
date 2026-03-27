@@ -187,6 +187,7 @@ export default function App() {
     chatContext, setChatContext,
     vizOptions, setVizOption,
     searchQuery, setSearchQuery,
+    labelScale, setLabelScale,
   } = useStore()
 
   // IDE panel state
@@ -435,6 +436,25 @@ export default function App() {
                         {VIZ_LABELS[key].slice(0, 3)}
                       </button>
                     ))}
+                    {/* Label scale A-/A+ */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4 }}>
+                      <button
+                        className="ide-icon-btn"
+                        onClick={() => setLabelScale(labelScale - 0.25)}
+                        title="Smaller labels"
+                        style={{ fontSize: 10, fontWeight: 700, width: 22, fontFamily: 'var(--ide-font-ui)' }}
+                      >A-</button>
+                      <span style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', color: 'var(--ide-fg-muted)', minWidth: 22, textAlign: 'center' }}>
+                        {labelScale.toFixed(1)}×
+                      </span>
+                      <button
+                        className="ide-icon-btn"
+                        onClick={() => setLabelScale(labelScale + 0.25)}
+                        title="Larger labels"
+                        style={{ fontSize: 10, fontWeight: 700, width: 22, fontFamily: 'var(--ide-font-ui)' }}
+                      >A+</button>
+                    </div>
+
                     {/* Inline search */}
                     <div className="ide-sidebar-search" style={{ border: '1px solid var(--ide-border)', borderRadius: 4, height: 22, padding: '0 6px', gap: 4, background: 'rgba(0,0,0,0.25)', marginLeft: 6, width: 130 }}>
                       <span className="ide-sidebar-search-icon" style={{ fontSize: 10 }}>⌕</span>

@@ -49,7 +49,9 @@ const FILE_META: Record<string, { color: string; accent: string; icon: string }>
 }
 
 function getFileMeta(ext: string) {
-  return FILE_META[ext.toLowerCase()] ?? FILE_META.default
+  const known = FILE_META[ext.toLowerCase()]
+  if (known) return known
+  return { ...FILE_META.default, icon: ext ? ext.toUpperCase().slice(0, 5) : '?' }
 }
 
 // ── Layout types ──────────────────────────────────────────────────────────────
@@ -147,7 +149,7 @@ function flattenLayout(root: DirLayout): { dirs: DirLayout[]; filePosMap: Map<st
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function SpreadTreeScene() {
-  const { quadNodes, agentSpheres, activeFileId, setActiveFileId, vizOptions, searchQuery } = useStore()
+  const { quadNodes, agentSpheres, activeFileId, setActiveFileId, vizOptions, searchQuery, labelScale } = useStore()
 
   const rootNode = quadNodes[ROOT_ID]
 
@@ -212,7 +214,7 @@ export function SpreadTreeScene() {
       {visibleDirs.map(dl => {
         const slabY  = dl.depth * 0.04
         const slabCz = dl.zTop + dl.slabD / 2
-        const labelSz = Math.min(10, Math.max(7, dl.slabW * 2.5))
+        const labelSz = Math.min(10, Math.max(7, dl.slabW * 2.5)) * labelScale
 
         // Check if this dir only has misc files and misc is hidden
         const visibleFiles = dl.files.filter(f => {
@@ -384,7 +386,7 @@ export function SpreadTreeScene() {
                           justifyContent: 'center',
                         }}>
                           <span style={{
-                            fontSize: '9px',
+                            fontSize: `${Math.round(9 * labelScale)}px`,
                             fontFamily: "'JetBrains Mono', monospace",
                             fontWeight: '800',
                             color: meta.accent,
@@ -396,7 +398,7 @@ export function SpreadTreeScene() {
                         {/* Filename */}
                         <span style={{
                           color: '#ffffff',
-                          fontSize: '11px',
+                          fontSize: `${Math.round(11 * labelScale)}px`,
                           fontFamily: "'JetBrains Mono', monospace",
                           fontWeight: '700',
                           whiteSpace: 'nowrap',

@@ -202,6 +202,9 @@ interface AppStore {
   // ── Viz filters ──
   vizOptions: { showFolders: boolean; showMisc: boolean; showSubmodules: boolean }
   setVizOption: (key: keyof AppStore['vizOptions'], value: boolean) => void
+  // ── Label scale (font size multiplier for scene file labels) ──
+  labelScale: number
+  setLabelScale: (scale: number) => void
   // ── Search ──
   searchQuery: string
   setSearchQuery: (q: string) => void
@@ -220,6 +223,7 @@ const SCENE_INITIAL = {
   sceneVisible: true,
   sceneMode: 'treemap' as 'treemap' | 'tree',
   vizOptions: { showFolders: true, showMisc: true, showSubmodules: true },
+  labelScale: 1.0,
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -303,6 +307,8 @@ export const useStore = create<AppStore>((set) => ({
 
   setVizOption: (key, value) =>
     set((state) => ({ vizOptions: { ...state.vizOptions, [key]: value } })),
+
+  setLabelScale: (scale) => set({ labelScale: Math.max(0.5, Math.min(3.0, scale)) }),
 
   setSearchQuery: (q) => set({ searchQuery: q }),
 

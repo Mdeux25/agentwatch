@@ -36,7 +36,10 @@ const FILE_META: Record<string, { color: string; accent: string; icon: string }>
 }
 
 function getFileMeta(ext: string) {
-  return FILE_META[ext.toLowerCase()] ?? FILE_META.default
+  const known = FILE_META[ext.toLowerCase()]
+  if (known) return known
+  // Use actual extension as icon (e.g. "CPP", "HPP", "JAVA") — never show "FILE"
+  return { ...FILE_META.default, icon: ext ? ext.toUpperCase().slice(0, 5) : '?' }
 }
 
 // ─── Layout types ─────────────────────────────────────────────────────────────
@@ -197,7 +200,7 @@ function isSubmoduleDir(node: QuadNode, allNodes: Record<string, QuadNode>): boo
 }
 
 export function TreemapScene() {
-  const { quadNodes, agentSpheres, activeFileId, setActiveFileId, vizOptions, searchQuery } = useStore()
+  const { quadNodes, agentSpheres, activeFileId, setActiveFileId, vizOptions, searchQuery, labelScale } = useStore()
 
   // ── Zoom-aware LOD: track camera Y so label density adapts as user zooms ──
   // Initial camera Y = 26 (full scene view). Smaller Y = zoomed in → more labels.
@@ -260,7 +263,7 @@ export function TreemapScene() {
         if (!isFile) {
           // ── Directory slab ───────────────────────────────────────────────
           const hdrH = Math.min(HDR, rect.h * 0.22)
-          const labelSize = Math.min(14, Math.max(8, Math.min(bw, bh) * 3))
+          const labelSize = Math.min(14, Math.max(8, Math.min(bw, bh) * 3)) * labelScale
 
           return (
             <group key={node.id} position={[cx, yBase, cz]}>
@@ -315,7 +318,7 @@ export function TreemapScene() {
 
         // ── File tile ─────────────────────────────────────────────────────────
         const meta = getFileMeta(node.ext)
-        const labelSize = Math.min(12, Math.max(7, Math.min(bw, bh) * 3.5))
+        const labelSize = Math.min(12, Math.max(7, Math.min(bw, bh) * 3.5)) * labelScale
         const q = searchQuery.trim().toLowerCase()
         const matchesSearch = !q || node.name.toLowerCase().includes(q) || node.ext.toLowerCase().includes(q)
         const dimmed = !!q && !matchesSearch
@@ -417,7 +420,7 @@ export function TreemapScene() {
                       justifyContent: 'center',
                     }}>
                       <span style={{
-                        fontSize: '8px',
+                        fontSize: `${Math.round(8 * labelScale)}px`,
                         fontFamily: "'JetBrains Mono', monospace",
                         fontWeight: '800',
                         color: meta.accent,
@@ -430,7 +433,7 @@ export function TreemapScene() {
                   <span
                     style={{
                       color: isAgentActive || isSelected ? '#ffffff' : meta.accent,
-                      fontSize: `${Math.max(labelSize, 10)}px`,
+                      fontSize: `${Math.max(labelSize, 9 * labelScale)}px`,
                       fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: '700',
                       whiteSpace: 'nowrap',
