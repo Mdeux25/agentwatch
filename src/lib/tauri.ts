@@ -2,6 +2,11 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { ClaudeEvent } from '../types/events'
 
+export async function openFolderDialog(): Promise<string | null> {
+  const result = await invoke<string>('open_folder_dialog')
+  return result || null
+}
+
 export async function sendPrompt(prompt: string, sessionId: string | null = null): Promise<void> {
   await invoke<void>('send_prompt', { prompt, sessionId })
 }

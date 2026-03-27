@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EventLog } from './components/EventLog'
 import { ChatInput } from './components/ChatInput'
@@ -7,11 +7,32 @@ import { useStore } from './store/useStore'
 import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull } from './lib/tauri'
 import { CodeEditorPanel } from './components/CodeEditorPanel'
 import { AvatarDot } from './components/AvatarDot'
+import { WelcomeModal } from './components/WelcomeModal'
 import { RenderErrorBoundary } from './components/scene/RenderErrorBoundary'
 import { buildEditDiff, DiffLines } from './lib/diffUtils'
 import { deriveFileHistory, deriveTaskHistory } from './lib/editHistory'
 import type { ClaudeEvent } from './types/events'
 import type { EditEntry, TaskEntry } from './lib/editHistory'
+
+// ── Recent project paths (localStorage) ──────────────────────────────────────
+const RECENT_KEY = 'claudeAvatar.recentPaths'
+const MAX_RECENT = 5
+
+function getRecentPaths(): string[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') } catch { return [] }
+}
+function saveRecentPath(path: string) {
+  const prev = getRecentPaths().filter(p => p !== path)
+  localStorage.setItem(RECENT_KEY, JSON.stringify([path, ...prev].slice(0, MAX_RECENT)))
+}
+
+// ── Repo summary cache ────────────────────────────────────────────────────────
+function getSummaryCache(path: string): string | null {
+  return localStorage.getItem(`claudeAvatar.summary:${path}`)
+}
+function setSummaryCache(path: string, summary: string) {
+  localStorage.setItem(`claudeAvatar.summary:${path}`, summary)
+}
 
 // ── File accent colours (matches scene FILE_META) ─────────────────────────────
 const EXT_COLOR: Record<string, string> = {
@@ -337,9 +358,74 @@ export default function App() {
   const activeNode = activeFileId ? quadNodes[activeFileId] : null
   const contextFileName = chatContext && activeNode ? activeNode.name : null
 
+  // ── Recent paths + open project ───────────────────────────────────────────
+  const [recentPaths] = useState<string[]>(getRecentPaths)
+
+  // Ref to track whether we've already sent the auto-summary for this path
+  const summarisedPathRef = useRef<string | null>(null)
+
+  const openProject = useCallback(async (path: string) => {
+    saveRecentPath(path)
+    resetScene()
+    clearSession()
+    addEvent({ type: 'assistant_message', message: `Scanning ${path}…`, timestamp: Date.now() })
+    setProcessing(true)
+    try {
+      const paths = await scanDirectory(path)
+      loadPaths(paths)
+
+      const capped = paths.length >= 600 ? ' (capped at 600)' : ''
+      const relPaths = paths.map(p => p.replace(path.endsWith('/') ? path : path + '/', ''))
+
+      addEvent({
+        type: 'result',
+        message: `Loaded **${paths.length} files**${capped} from \`${path}\``,
+        timestamp: Date.now(),
+      })
+
+      // Auto-summary: use cache if available, otherwise ask Claude
+      const cached = getSummaryCache(path)
+      if (cached) {
+        addEvent({ type: 'assistant_message', message: cached, timestamp: Date.now() })
+        setProcessing(false)
+      } else if (summarisedPathRef.current !== path) {
+        summarisedPathRef.current = path
+        // Store path so we can cache the response
+        pendingSummaryPathRef.current = path
+        const fileListPreview = relPaths.slice(0, 300).join('\n')
+        await sendPrompt(
+          `You are analysing a code repository. Based on the file list below, write a concise 3–5 sentence overview: what is this project, what is the main tech stack, and what are the key directories/components? Be direct and concrete.\n\nRoot: ${path}\n\nFiles (${paths.length} total):\n${fileListPreview}`,
+          null,
+        )
+      } else {
+        setProcessing(false)
+      }
+    } catch (err) {
+      addEvent({ type: 'error', message: `Failed to open project: ${err}`, timestamp: Date.now() })
+      setProcessing(false)
+    }
+  }, [resetScene, clearSession, addEvent, loadPaths, setProcessing])
+
+  // Cache the first assistant_message after an auto-summary request
+  const pendingSummaryPathRef = useRef<string | null>(null)
+  useEffect(() => {
+    const pending = pendingSummaryPathRef.current
+    if (!pending) return
+    const lastAssistant = [...events].reverse().find(e => e.type === 'assistant_message')
+    if (lastAssistant?.message && lastAssistant.message.length > 40) {
+      setSummaryCache(pending, lastAssistant.message)
+      pendingSummaryPathRef.current = null
+    }
+  }, [events])
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: 'var(--ide-bg)', color: 'var(--ide-fg)' }}>
+
+      {/* ── Welcome modal (shown until a project is loaded) ── */}
+      {!projectRoot && (
+        <WelcomeModal recentPaths={recentPaths} onOpen={openProject} />
+      )}
 
       {/* ── Title bar ── */}
       <div className="ide-titlebar">
