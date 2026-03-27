@@ -6,13 +6,15 @@ import type { QuadNode } from '../../types/events'
 interface Props {
   node: QuadNode
   yBase: number
+  cx?: number
+  cz?: number
 }
 
-export function FileSchemaCard({ node, yBase }: Props) {
+export function FileSchemaCard({ node, yBase, cx: cxProp, cz: czProp }: Props) {
   const activeFileContent = useStore((s) => s.activeFileContent)
 
-  const cx = node.bounds.x + node.bounds.w / 2
-  const cz = node.bounds.z + node.bounds.h / 2
+  const cx = cxProp ?? node.bounds.x + node.bounds.w / 2
+  const cz = czProp ?? node.bounds.z + node.bounds.h / 2
 
   const symbols = activeFileContent
     ? parseSymbols(activeFileContent, node.ext)

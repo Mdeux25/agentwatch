@@ -27,7 +27,15 @@ export function EventItem({ event }: EventItemProps) {
     ? `Tool: ${event.message}`
     : style.label
 
-  const isMarkdown = event.type === 'assistant_message'
+  const isMarkdown = event.type === 'assistant_message' || event.type === 'result'
+  // For tool_use, show the command/args from event.data if present
+  const toolBody = event.type === 'tool_use' && event.data
+    ? (() => {
+        const d = event.data as Record<string, unknown>
+        // Show the most useful field: command for Bash, file_path for file tools, pattern for Glob/Grep
+        return d.command ?? d.file_path ?? d.pattern ?? d.path ?? null
+      })()
+    : null
 
   return (
     <motion.div
@@ -40,19 +48,26 @@ export function EventItem({ event }: EventItemProps) {
         {style.icon}
       </span>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 select-text">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className={`${style.color} text-xs font-mono font-semibold uppercase tracking-wide`}>
+          <span className={`${style.color} text-xs font-mono font-semibold uppercase tracking-wide select-none`}>
             {label}
           </span>
-          <span className="text-gray-700 text-xs font-mono opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-gray-700 text-xs font-mono opacity-0 group-hover:opacity-100 transition-opacity select-none">
             {time}
           </span>
         </div>
 
+        {/* Tool body: command / path for tool_use events */}
+        {toolBody != null && (
+          <p className="text-purple-300/70 text-xs font-mono leading-relaxed whitespace-pre-wrap break-all opacity-80">
+            {String(toolBody)}
+          </p>
+        )}
+
         {event.message && event.type !== 'tool_use' && (
           isMarkdown ? (
-            <div className="prose prose-invert prose-sm max-w-none
+            <div className="prose prose-invert prose-sm max-w-none select-text
               prose-p:text-gray-300 prose-p:leading-relaxed prose-p:my-1
               prose-headings:text-gray-100 prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1
               prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
@@ -72,7 +87,7 @@ export function EventItem({ event }: EventItemProps) {
               </ReactMarkdown>
             </div>
           ) : (
-            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap break-words">
+            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap break-words select-text">
               {event.message}
             </p>
           )

@@ -47,8 +47,6 @@ interface LangCfg {
   kotlin:  boolean
 }
 
-const EMPTY = new Set<string>()
-
 const LANG: Record<string, LangCfg> = {
 
   // ── JavaScript / TypeScript ─────────────────────────────────────────────

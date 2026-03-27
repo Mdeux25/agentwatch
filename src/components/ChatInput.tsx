@@ -18,9 +18,11 @@ interface ChatInputProps {
   onSubmit: (prompt: string) => void
   onCommand: (name: string, args: string) => void
   isDisabled: boolean
+  contextFileName?: string | null
+  onDismissContext?: () => void
 }
 
-export function ChatInput({ onSubmit, onCommand, isDisabled }: ChatInputProps) {
+export function ChatInput({ onSubmit, onCommand, isDisabled, contextFileName, onDismissContext }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [selectedIdx, setSelectedIdx] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -121,6 +123,28 @@ export function ChatInput({ onSubmit, onCommand, isDisabled }: ChatInputProps) {
                 <span className="text-gray-600">{cmd.description}</span>
               </button>
             ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Context file badge */}
+      <AnimatePresence>
+        {contextFileName && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.12 }}
+            className="mb-2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950/60 border border-indigo-800/40"
+          >
+            <span className="text-indigo-500 text-[10px] font-mono">ctx</span>
+            <span className="text-indigo-300 text-xs font-mono truncate flex-1">{contextFileName}</span>
+            <button
+              onClick={onDismissContext}
+              className="text-indigo-700 hover:text-indigo-300 transition-colors text-sm leading-none ml-1 flex-shrink-0"
+            >
+              ×
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

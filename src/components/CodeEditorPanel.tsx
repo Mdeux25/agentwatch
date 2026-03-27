@@ -90,7 +90,6 @@ export function CodeEditorPanel() {
     activeFileId,
     activeFileContent,
     setActiveFileContent,
-    setActiveFileId,
     quadNodes,
   } = useStore()
 
@@ -119,8 +118,14 @@ export function CodeEditorPanel() {
   const content      = isTruncated ? rawLines.slice(0, MAX_LINES).join('\n') : rawContent
   const isDirty      = draft !== null && draft !== activeFileContent
   const lines        = content.split('\n')
-  const symbols     = useMemo(() => (activeFileContent ? parseSymbols(activeFileContent, ext) : []), [activeFileContent, ext])
-  const highlighted = useMemo(() => highlightCode(content, ext), [content, ext])
+  const symbols     = useMemo(() => {
+    try { return activeFileContent ? parseSymbols(activeFileContent, ext) : [] }
+    catch { return [] }
+  }, [activeFileContent, ext])
+  const highlighted = useMemo(() => {
+    try { return content ? highlightCode(content, ext) : '' }
+    catch { return content }   // fallback: plain text, no highlighting
+  }, [content, ext])
 
   if (!node || node.kind !== 'file') return null
 
@@ -187,27 +192,19 @@ export function CodeEditorPanel() {
 
   return (
     <div
-      style={{ width: 360, flexShrink: 0, display: 'flex', flexDirection: 'column', background: BG, borderRight: '1px solid rgba(255,255,255,0.05)', minHeight: 0, overflow: 'hidden' }}
+      style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: BG, minHeight: 0, overflow: 'hidden' }}
     >
 
-      {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div style={{ background: BG_HEADER, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '8px 12px', flexShrink: 0 }}>
-        {/* Row 1: path + save + close */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: symbols.length ? 7 : 0 }}>
-          {/* File type dot */}
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-            background: SYMBOL_COLORS['function'],
-            boxShadow: `0 0 6px ${SYMBOL_COLORS['function']}`,
-          }} />
-
+      {/* ── Subheader: breadcrumb + save + symbol chips ───────────────────── */}
+      <div style={{ background: BG_HEADER, borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '5px 12px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: symbols.length ? 5 : 0 }}>
           {/* Breadcrumb path */}
-          <span style={{ fontFamily: FONT, fontSize: 11, color: '#565f89', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          <span style={{ fontFamily: FONT, fontSize: 10, color: '#565f89', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             title={activeFileId ?? ''}>
             {breadcrumb}
           </span>
 
-          {/* ⌘S hint or save state */}
+          {/* Save state */}
           {isDirty ? (
             <button
               onClick={handleSave}
@@ -225,26 +222,15 @@ export function CodeEditorPanel() {
           ) : (
             <span style={{ fontFamily: FONT, fontSize: 9, color: '#3b4261', flexShrink: 0 }}>⌘S to save</span>
           )}
-
-          {/* Close */}
-          <button
-            onClick={() => { setDraft(null); setActiveFileId(null) }}
-            style={{ color: '#3b4261', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px', flexShrink: 0 }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#c0caf5')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#3b4261')}
-          >
-            ×
-          </button>
         </div>
 
-        {/* Row 2: symbol chips */}
+        {/* Symbol chips */}
         {symbols.length > 0 && (
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 1 }}>
             {symbols.map((sym) => (
               <button
                 key={`${sym.line}-${sym.name}`}
                 onClick={() => {
-                  // Jump to line in editor
                   const ta = taRef.current
                   if (!ta) return
                   const lineStart = content.split('\n').slice(0, sym.line - 1).join('\n').length + (sym.line > 1 ? 1 : 0)
@@ -256,16 +242,11 @@ export function CodeEditorPanel() {
                   setActiveLine(sym.line)
                 }}
                 style={{
-                  fontFamily: FONT,
-                  fontSize: 9,
-                  padding: '2px 7px',
-                  borderRadius: 10,
+                  fontFamily: FONT, fontSize: 9, padding: '2px 7px', borderRadius: 10,
                   border: `1px solid ${SYMBOL_COLORS[sym.kind]}44`,
                   background: `${SYMBOL_COLORS[sym.kind]}12`,
                   color: SYMBOL_COLORS[sym.kind],
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
+                  cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                 }}
               >
                 <span style={{ opacity: 0.6, marginRight: 3 }}>{SYMBOL_LETTER[sym.kind]}</span>

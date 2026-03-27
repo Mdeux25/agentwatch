@@ -190,13 +190,21 @@ interface AppStore {
   activeFileId: string | null       // most recently touched file (for preview)
   activeFilePreview: string | null
   sceneVisible: boolean
+  sceneMode: 'treemap' | 'tree'
   toggleScene: () => void
+  toggleSceneMode: () => void
   resetScene: () => void
   setActiveFileId: (id: string | null) => void
   setActiveFilePreview: (preview: string | null) => void
   activeFileContent: string | null
   setActiveFileContent: (content: string | null) => void
   loadPaths: (paths: string[]) => void
+  // ── Viz filters ──
+  vizOptions: { showFolders: boolean; showMisc: boolean; showSubmodules: boolean }
+  setVizOption: (key: keyof AppStore['vizOptions'], value: boolean) => void
+  // ── Search ──
+  searchQuery: string
+  setSearchQuery: (q: string) => void
   // ── Chat context injection ──
   chatContext: string | null
   setChatContext: (ctx: string | null) => void
@@ -210,6 +218,8 @@ const SCENE_INITIAL = {
   activeFilePreview: null as string | null,
   activeFileContent: null as string | null,
   sceneVisible: true,
+  sceneMode: 'treemap' as 'treemap' | 'tree',
+  vizOptions: { showFolders: true, showMisc: true, showSubmodules: true },
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -219,6 +229,7 @@ export const useStore = create<AppStore>((set) => ({
   avatarState: 'idle',
   emotion: 'neutral',
   chatContext: null,
+  searchQuery: '',
   ...SCENE_INITIAL,
 
   addEvent: (event) =>
@@ -285,6 +296,15 @@ export const useStore = create<AppStore>((set) => ({
   setAvatarState: (avatarState) => set({ avatarState }),
 
   toggleScene: () => set((state) => ({ sceneVisible: !state.sceneVisible })),
+
+  toggleSceneMode: () => set((state) => ({
+    sceneMode: state.sceneMode === 'treemap' ? 'tree' : 'treemap',
+  })),
+
+  setVizOption: (key, value) =>
+    set((state) => ({ vizOptions: { ...state.vizOptions, [key]: value } })),
+
+  setSearchQuery: (q) => set({ searchQuery: q }),
 
   resetScene: () => set({
     quadNodes: {} as Record<string, QuadNode>,

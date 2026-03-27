@@ -6,9 +6,10 @@ import type { AgentSphere } from '../../types/events'
 
 interface Props {
   sphere: AgentSphere
+  getWorldPos?: (fileId: string) => { x: number; z: number } | null
 }
 
-export function AgentSphereObject({ sphere }: Props) {
+export function AgentSphereObject({ sphere, getWorldPos }: Props) {
   const meshRef = useRef<Mesh>(null)
   const { quadNodes } = useStore()
 
@@ -32,9 +33,14 @@ export function AgentSphereObject({ sphere }: Props) {
     // Resolve target position from active quad node
     const node = sphere.activeFileId ? quadNodes[sphere.activeFileId] : null
     if (node) {
-      targetX.current = node.bounds.x + node.bounds.w / 2
-      targetZ.current = node.bounds.z + node.bounds.h / 2
-      targetY.current = 1.5 + node.depth * 0.025
+      if (getWorldPos) {
+        const wp = getWorldPos(sphere.activeFileId!)
+        if (wp) { targetX.current = wp.x; targetZ.current = wp.z; targetY.current = 1.5 }
+      } else {
+        targetX.current = node.bounds.x + node.bounds.w / 2
+        targetZ.current = node.bounds.z + node.bounds.h / 2
+        targetY.current = 1.5 + node.depth * 0.025
+      }
     } else {
       targetX.current = 0
       targetZ.current = 0
