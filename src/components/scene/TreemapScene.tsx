@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Html } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
 import { useStore } from '../../store/useStore'
 import { ROOT_ID } from '../../lib/quadTree'
@@ -198,6 +199,15 @@ function isSubmoduleDir(node: QuadNode, allNodes: Record<string, QuadNode>): boo
 export function TreemapScene() {
   const { quadNodes, agentSpheres, activeFileId, setActiveFileId, vizOptions, searchQuery } = useStore()
 
+  // ── Zoom-aware LOD: track camera Y so label density adapts as user zooms ──
+  // Initial camera Y = 26 (full scene view). Smaller Y = zoomed in → more labels.
+  const [zoomScale, setZoomScale] = useState(1.0)
+  useFrame(({ camera }) => {
+    const next = Math.min(26 / Math.max(camera.position.y, 1), 6)
+    // Only trigger re-render when zoom changes noticeably (>10%)
+    if (Math.abs(next - zoomScale) > 0.12) setZoomScale(next)
+  })
+
   const rootNode = quadNodes[ROOT_ID]
 
   const cells = useMemo(() => {
@@ -239,8 +249,13 @@ export function TreemapScene() {
         const bw = Math.max(rect.w - PAD, 0.02)
         const bh = Math.max(rect.h - PAD, 0.02)
 
-        const showLabel = bw > 0.45 && bh > 0.3
-        const showIcon  = bw > 0.22 && bh > 0.22
+        // Zoom-aware LOD: effectiveArea grows as user zooms in, so labels
+        // appear progressively as tiles become larger on screen.
+        // Threshold 4.0 → ~top 15 tiles at full zoom for 600-file project,
+        // ~all tiles at 3× zoom (zoomed into a section).
+        const effectiveArea = bw * bh * zoomScale * zoomScale
+        const showLabel = isAgentActive || isSelected || effectiveArea > 4.0
+        const showIcon  = isAgentActive || isSelected || effectiveArea > 1.8
 
         if (!isFile) {
           // ── Directory slab ───────────────────────────────────────────────
@@ -352,8 +367,8 @@ export function TreemapScene() {
               </mesh>
             )}
 
-            {/* Search match ring */}
-            {matchesSearch && q && !dimmed && showLabel && (
+            {/* Search match ring — show for any match regardless of tile size */}
+            {matchesSearch && q && !dimmed && (
               <Html position={[0, 0.09, 0]} center zIndexRange={[4, 0]}>
                 <div
                   className="search-match-ring"

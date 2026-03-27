@@ -356,8 +356,8 @@ export function SpreadTreeScene() {
                     </Html>
                   )}
 
-                  {/* Label card — show for selected/active or matched search */}
-                  {(isSelected || isActive || (matchesSearch && q)) && (
+                  {/* Label card — only for selected/active to avoid clutter in dense trees */}
+                  {(isSelected || isActive) && (
                     <Html position={[0, TILE_H / 2 + 0.07, 0]} center zIndexRange={[5, 0]}>
                       <div style={{
                         background: 'rgba(4, 7, 18, 0.92)',
