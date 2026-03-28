@@ -1,4 +1,4 @@
-# Claude Avatar
+# AgentWatch
 
 **A new kind of IDE — built for the era where the AI is the developer.**
 
@@ -9,7 +9,7 @@
 ![Status](https://img.shields.io/badge/status-early_alpha-f97316)
 ![Platform](https://img.shields.io/badge/platform-macOS-lightgrey)
 
-Most IDEs put AI in a sidebar. Claude Avatar flips that — Claude is the primary actor, the human is the director. The interface is built around *watching, guiding, and understanding* an AI agent as it works through your codebase.
+Most IDEs put AI in a sidebar. AgentWatch flips that — Claude is the primary actor, the human is the director. The interface is built around *watching, guiding, and understanding* an AI agent as it works through your codebase.
 
 > ⚠️ Early alpha — macOS only for now. Requires [Claude Code](https://claude.ai/code) to be installed.
 
@@ -57,7 +57,7 @@ Current AI coding tools are Copilot inside a traditional IDE. That's the 2023 pa
 
 The next paradigm is: **the AI drives, you supervise.** The interface should be built for that — spatial awareness of what the agent is doing, audit trail of every change, ability to redirect mid-task.
 
-Claude Avatar is an early exploration of what that IDE looks like.
+AgentWatch is an early exploration of what that IDE looks like.
 
 ---
 
@@ -108,7 +108,7 @@ npm install
 npm run tauri dev
 ```
 
-Open a project folder from the welcome screen. Claude Avatar will scan the directory, render the file tree, and Claude will generate a brief repo overview.
+Open a project folder from the welcome screen. AgentWatch will scan the directory, render the file tree, and Claude will generate a brief repo overview.
 
 From there, use the chat panel to give Claude tasks. Watch the 3D map as it works.
 
@@ -116,7 +116,7 @@ From there, use the chat panel to give Claude tasks. Watch the 3D map as it work
 
 ## How it works
 
-Claude Avatar launches `claude` as a subprocess and listens to its event stream over Tauri IPC:
+AgentWatch launches `claude` as a subprocess and listens to its event stream over Tauri IPC:
 
 ```
 user prompt → claude subprocess → event stream (tool_use, thinking, assistant_message, ...)
@@ -176,7 +176,7 @@ src-tauri/
 
 > Most developer tools are built around the assumption that a human writes code and a machine assists. That assumption is expiring.
 >
-> Claude Avatar is built on the opposite assumption: the machine does the work, the human provides direction and judgment. The interface follows from that — spatial, observational, supervisory.
+> AgentWatch is built on the opposite assumption: the machine does the work, the human provides direction and judgment. The interface follows from that — spatial, observational, supervisory.
 >
 > It's early. The paradigm isn't fully formed. But the direction is clear.
 

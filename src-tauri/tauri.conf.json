@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "claude-avatar",
+  "productName": "AgentWatch",
   "version": "0.1.0",
-  "identifier": "com.dusoft.claudeavatar",
+  "identifier": "com.dusoft.agentwatch",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Claude Avatar",
+        "title": "AgentWatch",
         "width": 1200,
         "height": 800,
         "resizable": true,

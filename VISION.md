@@ -1,4 +1,4 @@
-# Claude Avatar — Visual Agent Debugger: Implementation Plan
+# AgentWatch — Visual Agent Debugger: Implementation Plan
 
 ## The Core Shift
 
@@ -310,7 +310,7 @@ Phase 3 (the show-stopper for demos)
 
 ---
 
-## What this makes Claude Avatar into
+## What this makes AgentWatch into
 
 After Phase 3, the product is:
 

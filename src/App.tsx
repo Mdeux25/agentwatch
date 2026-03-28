@@ -446,7 +446,7 @@ export default function App() {
 
       {/* ── Title bar ── */}
       <div className="ide-titlebar">
-        <span className="ide-titlebar-title">Claude Avatar</span>
+        <span className="ide-titlebar-title">AgentWatch</span>
         {sessionId && (
           <button className="ide-chip" onClick={clearSession} title="Clear session">
             {sessionId.slice(0, 6)}… ×
@@ -743,7 +743,7 @@ export default function App() {
       <div className="ide-statusbar">
         <div className="ide-status-left">
           <div className={`ide-status-dot ${isProcessing ? 'processing' : ''}`} />
-          <span className="ide-status-item">Claude Avatar</span>
+          <span className="ide-status-item">AgentWatch</span>
           {sessionId && <span className="ide-status-dim">{sessionId.slice(0, 8)}</span>}
         </div>
         <div className="ide-status-right">

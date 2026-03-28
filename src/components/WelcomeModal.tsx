@@ -54,7 +54,7 @@ export function WelcomeModal({ recentPaths, onOpen }: WelcomeModalProps) {
         fontFamily: 'var(--ide-font-ui)',
         letterSpacing: '-0.02em',
       }}>
-        Claude Avatar
+        AgentWatch
       </h1>
       <p style={{
         margin: '0 0 36px',
