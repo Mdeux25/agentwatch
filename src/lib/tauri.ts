@@ -19,8 +19,8 @@ export async function readFilePreview(path: string): Promise<string> {
   return invoke<string>('read_file_preview', { path })
 }
 
-export async function scanDirectory(path: string): Promise<string[]> {
-  return invoke<string[]>('scan_directory', { path })
+export async function scanDirectory(path: string, useGitignore = true): Promise<string[]> {
+  return invoke<string[]>('scan_directory', { path, useGitignore })
 }
 
 export async function getHomeDir(): Promise<string> {

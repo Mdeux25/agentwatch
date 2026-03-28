@@ -205,6 +205,9 @@ interface AppStore {
   // ── Label scale (font size multiplier for scene file labels) ──
   labelScale: number
   setLabelScale: (scale: number) => void
+  // ── Scan options ──
+  useGitignore: boolean
+  setUseGitignore: (v: boolean) => void
   // ── Search ──
   searchQuery: string
   setSearchQuery: (q: string) => void
@@ -224,6 +227,7 @@ const SCENE_INITIAL = {
   sceneMode: 'treemap' as 'treemap' | 'tree',
   vizOptions: { showFolders: true, showMisc: true, showSubmodules: true },
   labelScale: 1.0,
+  useGitignore: true,
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -309,6 +313,8 @@ export const useStore = create<AppStore>((set) => ({
     set((state) => ({ vizOptions: { ...state.vizOptions, [key]: value } })),
 
   setLabelScale: (scale) => set({ labelScale: Math.max(0.5, Math.min(3.0, scale)) }),
+
+  setUseGitignore: (v) => set({ useGitignore: v }),
 
   setSearchQuery: (q) => set({ searchQuery: q }),
 

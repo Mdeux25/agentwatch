@@ -209,6 +209,7 @@ export default function App() {
     vizOptions, setVizOption,
     searchQuery, setSearchQuery,
     labelScale, setLabelScale,
+    useGitignore, setUseGitignore,
   } = useStore()
 
   // IDE panel state
@@ -344,7 +345,7 @@ export default function App() {
       localStorage.setItem(LAST_SCAN_KEY, path)
       resetScene()
       addEvent({ type: 'assistant_message', message: `Scanning ${path}…`, timestamp: Date.now() })
-      scanDirectory(path)
+      scanDirectory(path, useGitignore)
         .then(paths => {
           loadPaths(paths)
           const capped = paths.length >= 600 ? '\n⚠ Capped at 600 — use a more specific path.' : ''
@@ -364,14 +365,14 @@ export default function App() {
   // Ref to track whether we've already sent the auto-summary for this path
   const summarisedPathRef = useRef<string | null>(null)
 
-  const openProject = useCallback(async (path: string) => {
+  const openProject = useCallback(async (path: string, gitignore = useGitignore) => {
     saveRecentPath(path)
     resetScene()
     clearSession()
     addEvent({ type: 'assistant_message', message: `Scanning ${path}…`, timestamp: Date.now() })
     setProcessing(true)
     try {
-      const paths = await scanDirectory(path)
+      const paths = await scanDirectory(path, gitignore)
       loadPaths(paths)
 
       const capped = paths.length >= 600 ? ' (capped at 600)' : ''
@@ -404,7 +405,23 @@ export default function App() {
       addEvent({ type: 'error', message: `Failed to open project: ${err}`, timestamp: Date.now() })
       setProcessing(false)
     }
-  }, [resetScene, clearSession, addEvent, loadPaths, setProcessing])
+  }, [resetScene, clearSession, addEvent, loadPaths, setProcessing, useGitignore])
+
+  // Re-scan when gitignore toggle changes (if a project is already loaded)
+  const prevGitignoreRef = useRef(useGitignore)
+  useEffect(() => {
+    if (prevGitignoreRef.current === useGitignore) return
+    prevGitignoreRef.current = useGitignore
+    if (!projectRoot) return
+    resetScene()
+    addEvent({ type: 'assistant_message', message: `Re-scanning ${projectRoot} (gitignore ${useGitignore ? 'on' : 'off'})…`, timestamp: Date.now() })
+    scanDirectory(projectRoot, useGitignore)
+      .then(paths => {
+        loadPaths(paths)
+        addEvent({ type: 'result', message: `Loaded **${paths.length} files**`, timestamp: Date.now() })
+      })
+      .catch(err => addEvent({ type: 'error', message: `scan failed: ${err}`, timestamp: Date.now() }))
+  }, [useGitignore])
 
   // Cache the first assistant_message after an auto-summary request
   const pendingSummaryPathRef = useRef<string | null>(null)
@@ -522,6 +539,14 @@ export default function App() {
                         {VIZ_LABELS[key].slice(0, 3)}
                       </button>
                     ))}
+                    <button
+                      className={`ide-icon-btn ${useGitignore ? 'active' : 'dim'}`}
+                      onClick={() => setUseGitignore(!useGitignore)}
+                      title={useGitignore ? '.gitignore respected (click to show all)' : '.gitignore ignored (click to hide gitignored files)'}
+                      style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', fontWeight: 700, width: 28 }}
+                    >
+                      .gi
+                    </button>
                     {/* Label scale A-/A+ */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4 }}>
                       <button

@@ -23,27 +23,23 @@ fn get_home_dir() -> String {
 
 // ── Gitignore-aware directory scan ────────────────────────────────────────────
 
-const SKIP_DIRS: &[&str] = &[
-    "node_modules", "target", ".next", "dist", "build",
-    "__pycache__", ".cache", "vendor", ".turbo", ".venv", "venv",
-];
-
 const MAX_FILES: usize = 600;
 
-/// Scan a directory, respecting .gitignore rules and skipping submodules.
-/// Falls back to the old dumb scan if the ignore crate fails to build a walker.
+/// Scan a directory tree.
+/// - Always skips hidden entries (names starting with '.', e.g. .git, .DS_Store).
+/// - Optionally respects .gitignore rules at every directory level.
 #[tauri::command]
-fn scan_directory(path: String) -> Result<Vec<String>, String> {
+fn scan_directory(path: String, use_gitignore: bool) -> Result<Vec<String>, String> {
     use ignore::WalkBuilder;
 
     let root = std::path::PathBuf::from(&path);
     let mut results = Vec::new();
 
     let walker = WalkBuilder::new(&root)
-        .hidden(false)       // we handle dotfiles ourselves below
-        .git_ignore(true)    // respect .gitignore at every level
-        .git_global(false)   // skip machine-global gitignore
-        .git_exclude(false)  // skip .git/info/exclude
+        .hidden(true)                  // always skip dot-files and dot-dirs
+        .git_ignore(use_gitignore)     // toggled by the frontend
+        .git_global(false)
+        .git_exclude(false)
         .follow_links(false)
         .max_depth(Some(9))
         .build();
@@ -56,30 +52,8 @@ fn scan_directory(path: String) -> Result<Vec<String>, String> {
             Ok(e) => e,
             Err(_) => continue,
         };
-
-        let path = entry.path();
-
-        // Skip hidden root-level items (e.g. .git, .DS_Store)
-        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name.starts_with('.') {
-                // Allow hidden directories to be walked (gitignore handles them),
-                // but skip the entry itself from the results if it is a file.
-                if path.is_file() {
-                    continue;
-                }
-            }
-            if path.is_dir() && SKIP_DIRS.contains(&name) {
-                // Returning Err from filter_entry would be cleaner but this
-                // is simpler: skip adding the dir to results and the walker
-                // already won't descend because we filtered at the walker level.
-                // Actually WalkBuilder doesn't support per-entry filtering here,
-                // but SKIP_DIRS are usually caught by .gitignore anyway.
-                continue;
-            }
-        }
-
-        if path.is_file() {
-            results.push(path.to_string_lossy().to_string());
+        if entry.path().is_file() {
+            results.push(entry.path().to_string_lossy().to_string());
         }
     }
 
