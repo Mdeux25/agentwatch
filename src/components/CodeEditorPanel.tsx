@@ -127,8 +127,6 @@ export function CodeEditorPanel() {
     catch { return content }   // fallback: plain text, no highlighting
   }, [content, ext])
 
-  if (!node || node.kind !== 'file') return null
-
   // ── Scroll sync: textarea drives pre + gutter ──────────────────────────────
   const syncScroll = useCallback(() => {
     const ta = taRef.current
@@ -189,6 +187,8 @@ export function CodeEditorPanel() {
   // ── Breadcrumb (show last 2 path segments) ────────────────────────────────
   const parts = (activeFileId ?? '').split('/')
   const breadcrumb = parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : parts.join('/')
+
+  if (!node || node.kind !== 'file') return null
 
   return (
     <div
