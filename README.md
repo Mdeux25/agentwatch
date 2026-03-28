@@ -2,8 +2,8 @@
 
 **A new kind of IDE — built for the era where the AI is the developer.**
 
-[![GitHub stars](https://img.shields.io/github/stars/Mdeux25/claudeAvatar?style=flat&color=gold)](https://github.com/Mdeux25/claudeAvatar/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/Mdeux25/claudeAvatar?style=flat&color=blue)](https://github.com/Mdeux25/claudeAvatar/network)
+[![GitHub stars](https://img.shields.io/github/stars/Mdeux25/agentwatch?style=flat&color=gold)](https://github.com/Mdeux25/agentwatch/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Mdeux25/agentwatch?style=flat&color=blue)](https://github.com/Mdeux25/agentwatch/network)
 ![Built with](https://img.shields.io/badge/built_with-Tauri_+_React_+_Three.js-6366f1)
 ![License](https://img.shields.io/badge/license-MIT-22c55e)
 ![Status](https://img.shields.io/badge/status-early_alpha-f97316)
@@ -15,28 +15,18 @@ Most IDEs put AI in a sidebar. AgentWatch flips that — Claude is the primary a
 
 ---
 
-## Demo
-
-<!-- Replace with your actual screen recording -->
-<!-- Tip: record a 15-second GIF of Claude editing files while the 3D treemap lights up -->
-<!-- Tools: QuickTime → convert with gifski, or use Kap (free, mac) -->
-
-![demo](assets/demo.gif)
-
-> *Claude editing files while its agent sphere moves across the 3D treemap in real time*
-
----
-
 ## Screenshots
+
+<img src="assets/screenshot-1.png" alt="Understand any codebase in seconds" width="100%" />
 
 <table>
   <tr>
-    <td><img src="assets/screenshot-treemap.png" alt="3D Treemap explorer" /></td>
-    <td><img src="assets/screenshot-editor.png" alt="Code editor with diff panel" /></td>
+    <td><img src="assets/screenshot-2.png" alt="Watch your AI agent work in real time" /></td>
+    <td><img src="assets/screenshot-3.png" alt="Stop guessing how your code works" /></td>
   </tr>
   <tr>
-    <td align="center"><em>3D treemap — files colored by type, agent sphere shows live activity</em></td>
-    <td align="center"><em>Code editor with live diff panel and edit history</em></td>
+    <td align="center"><em>Watch your AI agent work in real time</em></td>
+    <td align="center"><em>Before vs after — see every change spatially</em></td>
   </tr>
 </table>
 
