@@ -15,6 +15,12 @@ Most IDEs put AI in a sidebar. AgentWatch flips that — Claude is the primary a
 
 ---
 
+## v1 Demo
+
+[![AgentWatch v1 Demo](https://img.youtube.com/vi/-8apdKWbR60/maxresdefault.jpg)](https://youtu.be/-8apdKWbR60)
+
+---
+
 ## Screenshots
 
 <img src="assets/screenshot-1.png" alt="Understand any codebase in seconds" width="100%" />
