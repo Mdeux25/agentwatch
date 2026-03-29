@@ -14,6 +14,8 @@ import { deriveFileHistory, deriveTaskHistory } from './lib/editHistory'
 import { UsagePanel } from './components/UsagePanel'
 import { appendUsageRecord } from './lib/usageStorage'
 import { calcCost } from './lib/usageCalc'
+import { MindMapPanel } from './components/mindmap/MindMapPanel'
+import { loadMindMap } from './lib/mindMapStorage'
 import type { ClaudeEvent } from './types/events'
 import type { EditEntry, TaskEntry } from './lib/editHistory'
 import type { UsageRecord } from './types/usage'
@@ -206,6 +208,7 @@ export default function App() {
     events, sessionId, isProcessing, avatarState,
     addEvent, setProcessing, setSessionId, clearSession,
     addSessionUsageRecord, toggleUsagePanel, usagePanelOpen,
+    setMindMapData,
     sceneMode, toggleSceneMode,
     activeFileId, quadNodes, projectRoot,
     setActiveFileContent, setActiveFileId,
@@ -220,6 +223,7 @@ export default function App() {
   // IDE panel state
   const [sceneOpen, setSceneOpen] = useState(true)
   const [chatOpen, setChatOpen] = useState(true)
+  const [editorTab, setEditorTab] = useState<'code' | 'mindmap'>('code')
   const [bottomTab, setBottomTab] = useState<'diff' | 'history' | null>(null)
   const [histTab, setHistTab] = useState<'file' | 'task'>('file')
 
@@ -303,6 +307,22 @@ export default function App() {
         }
         appendUsageRecord(record).catch(console.error)
         addSessionUsageRecord(record)
+      }
+      // Feed Read tool events into the mind map
+      if (
+        event.type === 'tool_use' &&
+        event.message === 'Read' &&
+        event.data && typeof (event.data as { file_path?: string }).file_path === 'string'
+      ) {
+        const fp = (event.data as { file_path: string }).file_path
+        const ext = fp.split('.').pop()?.toLowerCase() ?? ''
+        const state = useStore.getState()
+        const root = state.projectRoot
+        if (root && fp.startsWith(root)) {
+          readFileFull(fp).then(content => {
+            useStore.getState().addFileToMindMap(fp, content, ext, root)
+          }).catch(() => {})
+        }
       }
     }).then(fn => { if (cancelled) fn(); else unlisten = fn })
     return () => { cancelled = true; unlisten?.() }
@@ -400,6 +420,18 @@ export default function App() {
     try {
       const paths = await scanDirectory(path, gitignore)
       loadPaths(paths)
+      loadMindMap(path).then(data => {
+        if (data) {
+          // Restore layout positions but reset all nodes to black-box —
+          // user must explicitly click to expand each file.
+          const resetNodes = Object.fromEntries(
+            Object.entries(data.nodes).map(([id, n]) => [
+              id, { ...n, isBlackBox: true, symbols: [] },
+            ])
+          )
+          setMindMapData({ ...data, nodes: resetNodes })
+        }
+      }).catch(() => {})
 
       const capped = paths.length >= 600 ? ' (capped at 600)' : ''
       const relPaths = paths.map(p => p.replace(path.endsWith('/') ? path : path + '/', ''))
@@ -653,25 +685,51 @@ export default function App() {
 
               {/* Tab bar */}
               <div className="ide-tabbar">
-                {activeNode ? (
-                  <div className="ide-tab active">
-                    <div className="ide-tab-dot" style={{ background: fileAccent(activeNode.ext) }} />
-                    <span className="ide-tab-name">{activeNode.name}</span>
-                    {chatContext && <span className="ide-tab-dirty">·</span>}
-                    <button className="ide-tab-close" onClick={() => { setActiveFileId(null); setChatContext(null) }}>×</button>
-                  </div>
-                ) : (
-                  <div className="ide-tab active" style={{ color: 'var(--ide-fg-muted)', fontStyle: 'italic' }}>
-                    <span className="ide-tab-name">no file open</span>
-                  </div>
-                )}
+                {/* Code tab */}
+                <div
+                  className={`ide-tab ${editorTab === 'code' ? 'active' : ''}`}
+                  onClick={() => setEditorTab('code')}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {activeNode ? (
+                    <>
+                      <div className="ide-tab-dot" style={{ background: fileAccent(activeNode.ext) }} />
+                      <span className="ide-tab-name">{activeNode.name}</span>
+                      {chatContext && <span className="ide-tab-dirty">·</span>}
+                      <button className="ide-tab-close" onClick={e => { e.stopPropagation(); setActiveFileId(null); setChatContext(null) }}>×</button>
+                    </>
+                  ) : (
+                    <span className="ide-tab-name" style={{ color: 'var(--ide-fg-muted)', fontStyle: 'italic' }}>no file open</span>
+                  )}
+                </div>
+                {/* Mind map tab */}
+                <div
+                  className={`ide-tab ${editorTab === 'mindmap' ? 'active' : ''}`}
+                  onClick={() => setEditorTab('mindmap')}
+                  style={{ cursor: 'pointer', gap: 5 }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.7 }}>
+                    <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                    <circle cx="2" cy="2" r="1.2" stroke="currentColor" strokeWidth="1.1"/>
+                    <circle cx="10" cy="2" r="1.2" stroke="currentColor" strokeWidth="1.1"/>
+                    <circle cx="2" cy="10" r="1.2" stroke="currentColor" strokeWidth="1.1"/>
+                    <line x1="4.5" y1="4.5" x2="3" y2="3" stroke="currentColor" strokeWidth="1"/>
+                    <line x1="7.5" y1="4.5" x2="9" y2="3" stroke="currentColor" strokeWidth="1"/>
+                    <line x1="4.5" y1="7.5" x2="3" y2="9" stroke="currentColor" strokeWidth="1"/>
+                  </svg>
+                  <span className="ide-tab-name">Map</span>
+                </div>
               </div>
 
-              {/* Editor */}
+              {/* Editor / Mind map panel */}
               <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                <RenderErrorBoundary label="editor">
-                  <CodeEditorPanel />
-                </RenderErrorBoundary>
+                {editorTab === 'code' ? (
+                  <RenderErrorBoundary label="editor">
+                    <CodeEditorPanel />
+                  </RenderErrorBoundary>
+                ) : (
+                  <MindMapPanel />
+                )}
                 <UsagePanel />
               </div>
 

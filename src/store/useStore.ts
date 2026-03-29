@@ -8,6 +8,8 @@ import type {
   ToolInputWithPath,
 } from '../types/events'
 import type { UsageRecord } from '../types/usage'
+import type { MindMapData } from '../types/mindMap'
+import { buildFileMapDelta } from '../lib/mindMapBuilder'
 import {
   ROOT_ID,
   ROOT_BOUNDS,
@@ -220,6 +222,10 @@ interface AppStore {
   addSessionUsageRecord: (record: UsageRecord) => void
   usagePanelOpen: boolean
   toggleUsagePanel: () => void
+  // ── Mind map ──
+  mindMapData: MindMapData | null
+  setMindMapData: (data: MindMapData | null) => void
+  addFileToMindMap: (filePath: string, content: string, ext: string, projectRoot: string) => void
 }
 
 const SCENE_INITIAL = {
@@ -347,6 +353,24 @@ export const useStore = create<AppStore>((set) => ({
     set((state) => ({ sessionUsageRecords: [...state.sessionUsageRecords, record] })),
 
   toggleUsagePanel: () => set((state) => ({ usagePanelOpen: !state.usagePanelOpen })),
+
+  mindMapData: null,
+
+  setMindMapData: (data) => set({ mindMapData: data }),
+
+  addFileToMindMap: (filePath, content, ext, projectRoot) =>
+    set((state) => {
+      const existing = state.mindMapData ?? { nodes: {}, edges: [], showExternals: false }
+      const { newNodes, newEdges } = buildFileMapDelta(filePath, content, ext, projectRoot, existing)
+      const mergedNodes = { ...existing.nodes }
+      for (const n of newNodes) mergedNodes[n.id] = n
+      const edgeIds = new Set(existing.edges.map(e => e.id))
+      const mergedEdges = [
+        ...existing.edges,
+        ...newEdges.filter(e => !edgeIds.has(e.id)),
+      ]
+      return { mindMapData: { ...existing, nodes: mergedNodes, edges: mergedEdges } }
+    }),
 
   loadPaths: (paths) =>
     set((state) => {

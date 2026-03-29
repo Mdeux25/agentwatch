@@ -1,4 +1,5 @@
 import type { FileSymbol } from '../types/events'
+import type { PseudoLine } from '../types/mindMap'
 
 // ─── Color map (shared with FileSchemaCard) ───────────────────────────────────
 
@@ -134,4 +135,75 @@ export function parseSymbols(content: string, ext: string): FileSymbol[] {
   }
 
   return symbols
+}
+
+// ─── Pseudo-code extraction ───────────────────────────────────────────────────
+
+/**
+ * Extract 4–8 pseudo-code lines from a function body starting at `startLine`.
+ * Uses the next symbol's line (or startLine + 40) as the end bound.
+ */
+export function extractPseudo(
+  contentLines: string[],
+  startLine: number,   // 1-based
+  endLine: number,     // 1-based exclusive upper bound
+): PseudoLine[] {
+  const body = contentLines
+    .slice(startLine, Math.min(endLine, startLine + 40))
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && l !== '{' && l !== '}' && l !== '};')
+
+  const result: PseudoLine[] = []
+
+  for (const raw of body) {
+    if (result.length >= 7) break
+
+    // Comments
+    if (raw.startsWith('//') || raw.startsWith('/*') || raw.startsWith('*')) {
+      const text = raw.replace(/^\/\/\s*|^\/?\*+\s*/g, '')
+      if (text.length > 2) result.push({ t: 'comment', l: '// ' + text.slice(0, 50) })
+      continue
+    }
+
+    // Guards / control flow
+    if (/^(if|else|return|throw|switch|case|break|continue|for|while)\b/.test(raw)) {
+      const clean = raw.replace(/[{}]/g, '').slice(0, 52)
+      result.push({ t: 'keyword', l: clean })
+      continue
+    }
+
+    // Async calls / HTTP / await
+    if (/\bawait\b|\bfetch\b|\baxios\b|\binvoke\b/.test(raw) ||
+        /\.(get|post|put|delete|patch)\s*\(/.test(raw)) {
+      const clean = raw.slice(0, 52).replace(/[{}]/g, '')
+      result.push({ t: 'call', l: clean })
+      continue
+    }
+
+    // Result of awaited call (arrow assignment)
+    if (/=\s*await\b/.test(raw) || /^\w+\s*=/.test(raw) && /\(/.test(raw)) {
+      const name = (raw.match(/^(\w+)\s*=/) ?? [])[1] ?? ''
+      const rhs = raw.replace(/^.*?=\s*/, '').slice(0, 40)
+      result.push({ t: 'arrow', l: `→ ${name ? name + ' = ' : ''}${rhs}` })
+      continue
+    }
+
+    // State / simple assignments
+    if (/^(?:const|let|var|this\.|self\.)?\s*\w+\s*[+\-*]?=/.test(raw) && !/=>/.test(raw)) {
+      result.push({ t: 'assign', l: raw.slice(0, 52) })
+      continue
+    }
+
+    // Multi-param continuation lines (starts with identifier then comma or colon)
+    if (/^\w+[\w.]*[,:]\s/.test(raw) || raw.startsWith('}') || raw.startsWith(')')) {
+      continue // skip closing braces
+    }
+
+    // Generic — treat as param/misc
+    if (raw.length > 4) {
+      result.push({ t: 'param', l: raw.slice(0, 52) })
+    }
+  }
+
+  return result
 }
