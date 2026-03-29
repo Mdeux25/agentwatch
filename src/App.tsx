@@ -662,6 +662,25 @@ export default function App() {
                       >+</button>
                     </div>
 
+                    {/* Filter toggles */}
+                    {(['showFolders', 'showMisc', 'showSubmodules'] as const).map(key => (
+                      <button
+                        key={key}
+                        className={`ide-icon-btn ${vizOptions[key] ? 'active' : 'dim'}`}
+                        onClick={() => setVizOption(key, !vizOptions[key])}
+                        title={VIZ_LABELS[key]}
+                        style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', fontWeight: 700, width: 28 }}
+                      >
+                        {VIZ_LABELS[key].slice(0, 3)}
+                      </button>
+                    ))}
+                    <button
+                      className={`ide-icon-btn ${useGitignore ? 'active' : 'dim'}`}
+                      onClick={() => setUseGitignore(!useGitignore)}
+                      title={useGitignore ? '.gitignore respected' : '.gitignore ignored'}
+                      style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', fontWeight: 700, width: 28 }}
+                    >.gi</button>
+
                     {/* Inline search */}
                     <div className="ide-sidebar-search" style={{ border: '1px solid var(--ide-border)', borderRadius: 4, height: 22, padding: '0 6px', gap: 4, background: 'rgba(0,0,0,0.25)', marginLeft: 6, width: 130 }}>
                       <span className="ide-sidebar-search-icon" style={{ fontSize: 10 }}>⌕</span>

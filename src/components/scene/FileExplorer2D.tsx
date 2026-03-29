@@ -143,6 +143,14 @@ export function FileExplorer2D({ zoom }: Props) {
   const searchQuery     = useStore(s => s.searchQuery)
   const activeFileId    = useStore(s => s.activeFileId)
   const setActiveFileId = useStore(s => s.setActiveFileId)
+  const agentSpheres    = useStore(s => s.agentSpheres)
+  const vizOptions      = useStore(s => s.vizOptions)
+
+  // Files Claude is actively reading/writing right now
+  const agentActiveIds = useMemo(
+    () => new Set(Object.values(agentSpheres).map(s => s.activeFileId).filter(Boolean) as string[]),
+    [agentSpheres],
+  )
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize]       = useState({ w: 400, h: 400 })
@@ -166,6 +174,23 @@ export function FileExplorer2D({ zoom }: Props) {
   // Treemap dimensions (zoom scales the layout, not just the view)
   const tmW = size.w * zoom / 100
   const tmH = size.h * zoom / 100
+
+  // Submodule dir IDs: directories that contain a child named '.git'
+  const submoduleIds = useMemo(() => {
+    const ids = new Set<string>()
+    function markDescendants(id: string) {
+      ids.add(id)
+      const n = quadNodes[id]
+      if (n) (n.childIds as string[]).forEach(markDescendants)
+    }
+    Object.values(quadNodes).forEach(n => {
+      if (n.kind === 'directory') {
+        const hasGit = (n.childIds as string[]).some(cid => quadNodes[cid]?.name === '.git')
+        if (hasGit) markDescendants(n.id)
+      }
+    })
+    return ids
+  }, [quadNodes])
 
   // Build tile tree whenever nodes or panel size change
   const flatTiles = useMemo<Tile[]>(() => {
@@ -235,6 +260,11 @@ export function FileExplorer2D({ zoom }: Props) {
           const { x, y, w, h } = tile.rect
           if (w < 2 || h < 2) return null
 
+          // ── vizOptions filters ──
+          if (tile.kind === 'directory' && !vizOptions.showFolders) return null
+          if (!vizOptions.showSubmodules && submoduleIds.has(tile.id)) return null
+          if (tile.kind === 'file' && !vizOptions.showMisc && !EXT_COLOR[tile.ext]) return null
+
           if (tile.kind === 'directory') {
             const showLabel = w > 22 && h > 12
             const fs = Math.min(11, Math.max(8, Math.min(w * 0.1, 11)))
@@ -263,12 +293,20 @@ export function FileExplorer2D({ zoom }: Props) {
             )
           }
 
-          // ── File tile: card style ──
-          const isActive = tile.id === activeFileId
-          const isMatch  = !searchQuery || tile.name.toLowerCase().includes(searchQuery.toLowerCase())
-          const accent   = EXT_COLOR[tile.ext] ?? '#64748b'
-          const showName = w > 26 && h > 11
-          const fs       = Math.min(11, Math.max(7, Math.min(h * 0.55, w * 0.1)))
+          // ── File tile ──
+          const isAgentActive = agentActiveIds.has(tile.id)
+          const isSelected    = tile.id === activeFileId
+          const isMatch       = !searchQuery || tile.name.toLowerCase().includes(searchQuery.toLowerCase())
+          const accent        = EXT_COLOR[tile.ext] ?? '#64748b'
+          const showName      = w > 26 && h > 11
+          const fs            = Math.min(11, Math.max(7, Math.min(h * 0.55, w * 0.1)))
+
+          const bg = isAgentActive
+            ? `${accent}22`
+            : isSelected ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'
+          const borderColor = isAgentActive
+            ? accent
+            : isSelected ? `${accent}80` : 'rgba(255,255,255,0.07)'
 
           return (
             <div
@@ -276,28 +314,40 @@ export function FileExplorer2D({ zoom }: Props) {
               onClick={() => { if (!hasMoved.current) setActiveFileId(tile.id) }}
               style={{
                 position: 'absolute', left: x, top: y, width: w, height: h,
-                background: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${isActive ? accent + '80' : 'rgba(255,255,255,0.07)'}`,
+                background: bg,
+                border: `1px solid ${borderColor}`,
                 borderRadius: 3,
                 boxSizing: 'border-box',
                 cursor: 'pointer',
                 opacity: searchQuery && !isMatch ? 0.1 : 1,
-                overflow: 'hidden',
+                overflow: 'visible',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
                 padding: '0 5px',
+                // CSS color drives the ping rings' currentColor
+                color: accent,
               }}
             >
-              {/* Left accent bar */}
+              {/* Agent ping rings (reuse existing CSS classes from index.css) */}
+              {isAgentActive && (
+                <div style={{ position: 'absolute', inset: -3, borderRadius: 5, pointerEvents: 'none' }}>
+                  <div className="agent-ping-outer" />
+                  <div className="agent-ping-inner" />
+                </div>
+              )}
+
+              {/* Left accent bar — bright when Claude touched it */}
               <div style={{
                 width: 2, height: '60%', borderRadius: 1, flexShrink: 0,
-                background: tile.accessCount > 0 ? accent : 'rgba(255,255,255,0.12)',
+                background: isAgentActive || tile.accessCount > 0 ? accent : 'rgba(255,255,255,0.12)',
               }} />
+
               {showName && (
                 <span style={{
                   fontSize: fs, fontFamily: 'JetBrains Mono, monospace',
-                  color: '#ccc', overflow: 'hidden', textOverflow: 'ellipsis',
+                  color: isAgentActive ? '#fff' : '#ccc',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap', flex: 1,
                 }}>
                   {tile.name}
