@@ -125,6 +125,95 @@ fn load_usage_records() -> Result<String, String> {
     }
 }
 
+// ── Context meta files ────────────────────────────────────────────────────────
+
+/// Write .agentwatch/context/{rel_path}.html and .ctx.md, ensure .gitignore covers .agentwatch/
+#[tauri::command]
+fn save_context_files(
+    project_root: String,
+    file_path: String,
+    html: String,
+    ctx_md: String,
+) -> Result<(), String> {
+    // Compute relative path (strip project_root prefix)
+    let rel = file_path
+        .strip_prefix(&project_root)
+        .unwrap_or(&file_path)
+        .trim_start_matches('/');
+
+    let context_dir = format!("{}/.agentwatch/context", project_root);
+    std::fs::create_dir_all(&context_dir).map_err(|e| e.to_string())?;
+
+    // Preserve directory structure under context_dir
+    let html_path = format!("{}/{}.html", context_dir, rel);
+    let md_path   = format!("{}/{}.ctx.md", context_dir, rel);
+
+    // Create parent dirs for nested files
+    if let Some(parent) = std::path::Path::new(&html_path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    std::fs::write(&html_path, html).map_err(|e| e.to_string())?;
+    std::fs::write(&md_path, ctx_md).map_err(|e| e.to_string())?;
+
+    // Ensure .agentwatch/ is in .gitignore
+    let gitignore_path = format!("{}/.gitignore", project_root);
+    let entry = ".agentwatch/\n";
+    match std::fs::read_to_string(&gitignore_path) {
+        Ok(existing) => {
+            if !existing.contains(".agentwatch/") {
+                let mut updated = existing;
+                if !updated.ends_with('\n') { updated.push('\n'); }
+                updated.push_str(entry);
+                std::fs::write(&gitignore_path, updated).map_err(|e| e.to_string())?;
+            }
+        }
+        Err(_) => {
+            // No .gitignore yet — create one
+            std::fs::write(&gitignore_path, entry).map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+// ── File summary via claude -p ────────────────────────────────────────────────
+
+fn find_claude_bin() -> Result<String, String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = [
+        format!("{home}/.local/bin/claude"),
+        "/usr/local/bin/claude".to_string(),
+        "/opt/homebrew/bin/claude".to_string(),
+        "/usr/bin/claude".to_string(),
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return Ok(path.clone());
+        }
+    }
+    Err("claude CLI not found".to_string())
+}
+
+#[tauri::command]
+async fn generate_file_summary(path: String, content: String) -> Result<String, String> {
+    let claude = find_claude_bin()?;
+    let truncated = if content.len() > 8000 { &content[..8000] } else { &content };
+    let prompt = format!(
+        "Summarize this file concisely for a developer. Describe what it does, its key functions/endpoints/components, parameters, return values, and any notable patterns or issues. Be specific and technical. Keep it under 300 words.\n\nFile: {path}\n\n```\n{truncated}\n```"
+    );
+    let output = tokio::process::Command::new(&claude)
+        .args(["-p", &prompt])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
 // ── App entry point ───────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -143,6 +232,8 @@ pub fn run() {
             write_file,
             append_usage_record,
             load_usage_records,
+            save_context_files,
+            generate_file_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

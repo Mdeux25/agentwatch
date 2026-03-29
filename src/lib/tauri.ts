@@ -35,6 +35,19 @@ export async function writeFile(path: string, content: string): Promise<void> {
   return invoke<void>('write_file', { path, content })
 }
 
+export async function generateFileSummary(path: string, content: string): Promise<string> {
+  return invoke<string>('generate_file_summary', { path, content })
+}
+
+export async function saveContextFiles(
+  projectRoot: string,
+  filePath: string,
+  html: string,
+  ctxMd: string,
+): Promise<void> {
+  return invoke<void>('save_context_files', { projectRoot, filePath, html, ctxMd })
+}
+
 export async function listenForEvents(
   handler: (event: ClaudeEvent) => void,
 ): Promise<UnlistenFn> {

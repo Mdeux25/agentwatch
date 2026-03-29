@@ -4,7 +4,8 @@ import { EventLog } from './components/EventLog'
 import { ChatInput } from './components/ChatInput'
 import { SceneCanvas } from './components/scene/SceneCanvas'
 import { useStore } from './store/useStore'
-import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull } from './lib/tauri'
+import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull, saveContextFiles, generateFileSummary } from './lib/tauri'
+import { generateContextMd, wrapSummaryHtml } from './lib/metaFileGen'
 import { CodeEditorPanel } from './components/CodeEditorPanel'
 import { AvatarDot } from './components/AvatarDot'
 import { WelcomeModal } from './components/WelcomeModal'
@@ -15,7 +16,6 @@ import { UsagePanel } from './components/UsagePanel'
 import { appendUsageRecord } from './lib/usageStorage'
 import { calcCost } from './lib/usageCalc'
 import { MindMapPanel } from './components/mindmap/MindMapPanel'
-import { loadMindMap } from './lib/mindMapStorage'
 import type { ClaudeEvent } from './types/events'
 import type { EditEntry, TaskEntry } from './lib/editHistory'
 import type { UsageRecord } from './types/usage'
@@ -48,6 +48,20 @@ const EXT_COLOR: Record<string, string> = {
   rs: '#fb923c', rb: '#cc342d', vue: '#4ade80', dart: '#22d3ee',
 }
 function fileAccent(ext: string) { return EXT_COLOR[ext.toLowerCase()] ?? '#64748b' }
+
+function loadingHtml(filePath: string): string {
+  const label = filePath.split('/').pop() ?? filePath
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#13131a;color:#4b5563;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:10px}
+    .name{color:#6b7280;font-size:13px}.dot{animation:blink 1s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+    @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  </style></head><body>
+    <div class="name">${label}</div>
+    <div style="display:flex;gap:4px"><span class="dot">·</span><span class="dot">·</span><span class="dot">·</span></div>
+    <div style="font-size:10px;color:#2d3040">generating summary</div>
+  </body></html>`
+}
 
 // ── Viz filter labels ─────────────────────────────────────────────────────────
 const VIZ_LABELS: Record<string, string> = {
@@ -223,7 +237,8 @@ export default function App() {
   // IDE panel state
   const [sceneOpen, setSceneOpen] = useState(true)
   const [chatOpen, setChatOpen] = useState(true)
-  const [editorTab, setEditorTab] = useState<'code' | 'mindmap'>('code')
+  const [editorTab, setEditorTab] = useState<'code' | 'mindmap' | 'summary'>('code')
+  const [contextHtml, setContextHtml] = useState<string | null>(null)
   const [bottomTab, setBottomTab] = useState<'diff' | 'history' | null>(null)
   const [histTab, setHistTab] = useState<'file' | 'task'>('file')
 
@@ -324,6 +339,30 @@ export default function App() {
           }).catch(() => {})
         }
       }
+      // Regenerate meta files when Claude edits/writes a file
+      if (
+        event.type === 'tool_use' &&
+        ['Edit', 'Write', 'MultiEdit'].includes(event.message ?? '') &&
+        event.data && typeof (event.data as { file_path?: string }).file_path === 'string'
+      ) {
+        const fp = (event.data as { file_path: string }).file_path
+        const root = useStore.getState().projectRoot
+        if (root && fp.startsWith(root)) {
+          setTimeout(() => {
+            readFileFull(fp).then(content => {
+              const ext = fp.split('.').pop()?.toLowerCase() ?? ''
+              const md = generateContextMd(fp, content, ext)
+              generateFileSummary(fp, content)
+                .then(summaryText => {
+                  const html = wrapSummaryHtml(fp, ext, summaryText)
+                  if (fp === useStore.getState().activeFileId) setContextHtml(html)
+                  saveContextFiles(root, fp, html, md).catch(() => {})
+                })
+                .catch(() => {})
+            }).catch(() => {})
+          }, 800)
+        }
+      }
     }).then(fn => { if (cancelled) fn(); else unlisten = fn })
     return () => { cancelled = true; unlisten?.() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,7 +389,7 @@ export default function App() {
   const BINARY_EXTS = new Set(['png','jpg','jpeg','gif','webp','bmp','ico','tiff','svg','woff','woff2','ttf','otf','eot','pdf','zip','tar','gz','dmg','exe','bin','dylib','so','a','o'])
 
   useEffect(() => {
-    if (!activeFileId) { setActiveFileContent(null); setChatContext(null); return }
+    if (!activeFileId) { setActiveFileContent(null); setChatContext(null); setContextHtml(null); return }
     const node = quadNodes[activeFileId]
     if (!node || node.kind !== 'file') { setActiveFileContent(null); setChatContext(null); return }
     if (BINARY_EXTS.has(node.ext)) { setActiveFileContent(null); setChatContext(null); return }
@@ -359,6 +398,24 @@ export default function App() {
       .then(content => {
         setActiveFileContent(content)
         setChatContext(`<file path="${node.id}">\n${content}\n</file>`)
+        // Add to mind map: this file expanded + its direct imports as black boxes
+        const root = useStore.getState().projectRoot
+        if (root) {
+          useStore.getState().addFileToMindMap(node.id, content, node.ext, root)
+          // Save LLM context file (.ctx.md) immediately
+          const md = generateContextMd(node.id, content, node.ext)
+          // Generate human summary via claude -p (async, show loading)
+          setContextHtml(loadingHtml(node.id))
+          generateFileSummary(node.id, content)
+            .then(summaryText => {
+              const html = wrapSummaryHtml(node.id, node.ext, summaryText)
+              setContextHtml(html)
+              saveContextFiles(root, node.id, html, md).catch(() => {})
+            })
+            .catch(() => {
+              setContextHtml(null)
+            })
+        }
       })
       .catch(() => { setActiveFileContent(null); setChatContext(null) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -420,18 +477,7 @@ export default function App() {
     try {
       const paths = await scanDirectory(path, gitignore)
       loadPaths(paths)
-      loadMindMap(path).then(data => {
-        if (data) {
-          // Restore layout positions but reset all nodes to black-box —
-          // user must explicitly click to expand each file.
-          const resetNodes = Object.fromEntries(
-            Object.entries(data.nodes).map(([id, n]) => [
-              id, { ...n, isBlackBox: true, symbols: [] },
-            ])
-          )
-          setMindMapData({ ...data, nodes: resetNodes })
-        }
-      }).catch(() => {})
+      setMindMapData(null) // always start with empty map — user opens files to explore
 
       const capped = paths.length >= 600 ? ' (capped at 600)' : ''
       const relPaths = paths.map(p => p.replace(path.endsWith('/') ? path : path + '/', ''))
@@ -719,6 +765,22 @@ export default function App() {
                   </svg>
                   <span className="ide-tab-name">Map</span>
                 </div>
+                {/* Context preview tab */}
+                {contextHtml && (
+                  <div
+                    className={`ide-tab ${editorTab === 'summary' ? 'active' : ''}`}
+                    onClick={() => setEditorTab('context')}
+                    style={{ cursor: 'pointer', gap: 5 }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.7 }}>
+                      <rect x="1.5" y="1" width="9" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <line x1="3.5" y1="4" x2="8.5" y2="4" stroke="currentColor" strokeWidth="1"/>
+                      <line x1="3.5" y1="6" x2="8.5" y2="6" stroke="currentColor" strokeWidth="1"/>
+                      <line x1="3.5" y1="8" x2="6.5" y2="8" stroke="currentColor" strokeWidth="1"/>
+                    </svg>
+                    <span className="ide-tab-name">Summary</span>
+                  </div>
+                )}
               </div>
 
               {/* Editor / Mind map panel */}
@@ -727,8 +789,15 @@ export default function App() {
                   <RenderErrorBoundary label="editor">
                     <CodeEditorPanel />
                   </RenderErrorBoundary>
-                ) : (
+                ) : editorTab === 'mindmap' ? (
                   <MindMapPanel />
+                ) : (
+                  <iframe
+                    srcDoc={contextHtml ?? ''}
+                    style={{ flex: 1, width: '100%', height: '100%', border: 'none', display: 'block' }}
+                    sandbox="allow-same-origin"
+                    title="file summary"
+                  />
                 )}
                 <UsagePanel />
               </div>

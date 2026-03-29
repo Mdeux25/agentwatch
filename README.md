@@ -85,6 +85,8 @@ The app runs Claude Code as a subprocess and streams its events (tool use, think
 - **Symbol navigation** — functions, classes, and variables extracted from open files as clickable chips.
 - **Font size control** — A- / A+ buttons scale all scene labels globally.
 - **Usage dashboard** — token usage and USD cost tracked per task, per project, per day, monthly, and all-time. Persists to `~/.agentwatch/usage.jsonl` across sessions. Includes a 7-day cost bar chart, per-task input/output token split bars, and a project breakdown donut chart.
+- **File mind map** — force-directed dependency graph of your codebase. Open a file to see it expanded with its direct imports as unexplored (black-box) nodes. Click any black-box to expand it; collapse back with one click. Scan the full project to add all files as nodes at once.
+- **File summaries** — every file you open gets a Claude-generated human-readable summary (symbols, endpoints, notable patterns) rendered in a **Summary** tab. Also writes a compact `.ctx.md` for token-efficient context in future Claude sessions. Both saved to `.agentwatch/context/` (auto-added to `.gitignore`). Summaries regenerate automatically when Claude edits a file.
 
 ---
 
@@ -143,6 +145,9 @@ src/
   lib/
     diffUtils.ts    # Diff parsing + rendering
     editHistory.ts  # Session edit history derivation
+    metaFileGen.ts  # Claude summary HTML + .ctx.md generator
+    mindMapBuilder.ts
+    mindMapStorage.ts
     quadTree.ts     # Tree layout math
     syntaxHighlight.ts
     tauri.ts        # Tauri IPC wrappers
