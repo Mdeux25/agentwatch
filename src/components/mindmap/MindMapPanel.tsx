@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion'
 import { useStore } from '../../store/useStore'
 import { ForceCanvas } from './ForceCanvas'
 import { PseudoPanel } from './PseudoPanel'
+import { ArchPanel } from './ArchPanel'
 import { saveMindMap } from '../../lib/mindMapStorage'
 import { readFileFull } from '../../lib/tauri'
 import type { MapNode, MindMapData } from '../../types/mindMap'
@@ -33,12 +34,15 @@ export function MindMapPanel() {
   const projectRoot      = useStore(s => s.projectRoot)
   const quadNodes        = useStore(s => s.quadNodes)
 
+  const [mapView, setMapView]           = useState<'graph' | 'arch'>('arch')
   const [selectedId, setSelectedId]     = useState<string | null>(null)
   const [pseudoState, setPseudoState]   = useState<PseudoState | null>(null)
   const [dimensions, setDimensions]     = useState({ w: 800, h: 600 })
   const [scanning, setScanning]         = useState(false)
+  const [scanProgress, setScanProgress] = useState<{ done: number; total: number } | null>(null)
   const [expandingIds, setExpandingIds] = useState<Set<string>>(new Set())
-  const containerRef = useRef<HTMLDivElement>(null)
+  const containerRef    = useRef<HTMLDivElement>(null)
+  const lastScannedRoot = useRef<string | null>(null)
 
   useEffect(() => {
     const el = containerRef.current
@@ -50,6 +54,52 @@ export function MindMapPanel() {
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
+
+  // ── Full read-scan: reads every file, adds as explored nodes ─────────────────
+  const handleAnalyzeFolder = useCallback(async () => {
+    if (!projectRoot || scanning) return
+    const filePaths = Object.values(quadNodes)
+      .filter(n => n.kind === 'file' && !BINARY_EXTS.has(n.ext?.toLowerCase() ?? ''))
+      .map(n => n.id)
+      .filter(fp => fp.startsWith(projectRoot))
+      .slice(0, 150)
+    if (filePaths.length === 0) return
+
+    setScanning(true)
+    setScanProgress({ done: 0, total: filePaths.length })
+    let done = 0
+    const BATCH = 8
+    for (let i = 0; i < filePaths.length; i += BATCH) {
+      const batch = filePaths.slice(i, i + BATCH)
+      await Promise.all(batch.map(async fp => {
+        try {
+          const content = await readFileFull(fp)
+          const ext = fp.split('.').pop()?.toLowerCase() ?? ''
+          useStore.getState().addFileToMindMap(fp, content, ext, projectRoot)
+        } catch { /* unreadable — skip */ }
+        done++
+        setScanProgress({ done, total: filePaths.length })
+      }))
+    }
+    const saved = useStore.getState().mindMapData
+    if (saved && projectRoot) saveMindMap(projectRoot, saved).catch(() => {})
+    setScanning(false)
+    setScanProgress(null)
+  }, [projectRoot, quadNodes, scanning])
+
+  // ── Auto-scan once on project open (if no existing map data) ─────────────────
+  useEffect(() => {
+    const fileCount = Object.values(quadNodes).filter(n => n.kind === 'file' && !BINARY_EXTS.has(n.ext?.toLowerCase() ?? '')).length
+    if (!projectRoot || fileCount === 0) return
+    if (lastScannedRoot.current === projectRoot) return
+    if (mindMapData && Object.keys(mindMapData.nodes).length > 0) {
+      lastScannedRoot.current = projectRoot
+      return
+    }
+    lastScannedRoot.current = projectRoot
+    handleAnalyzeFolder()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectRoot, Object.keys(quadNodes).length])
 
   // ── Scan: add all files as BLACK BOXES (no reading) ───────────────────────────
   const handleScanProject = useCallback(async () => {
@@ -171,7 +221,7 @@ export function MindMapPanel() {
         fontFamily: "'JetBrains Mono',ui-monospace,monospace",
       }}>
         <div style={{ fontSize: 28, color: '#2d3050' }}>◈</div>
-        <div style={{ color: '#3d4468', fontSize: 13, letterSpacing: '.04em' }}>Mind Map</div>
+        <div style={{ color: '#3d4468', fontSize: 13, letterSpacing: '.04em' }}>ARCH</div>
         {scanning ? (
           <div style={{ color: '#4fc3f7', fontSize: 11 }}>adding files…</div>
         ) : codeFileCount > 0 && projectRoot ? (
@@ -200,12 +250,33 @@ export function MindMapPanel() {
         background: '#252526', borderBottom: '1px solid #3e3e42',
         fontFamily: "'JetBrains Mono',ui-monospace,monospace", flexShrink: 0,
       }}>
-        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#555' }}>◈ Mind Map</span>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: '#555' }}>◈ ARCH</span>
         <div style={{ width: 1, height: 18, background: '#3e3e42', margin: '0 2px' }} />
-        <span style={{ fontSize: 11, color: '#444' }}>{nodeCount} nodes · {edgeCount} edges</span>
+        {scanProgress ? (
+          <span style={{ fontSize: 11, color: '#4fc3f7' }}>
+            scanning {scanProgress.done}/{scanProgress.total} files…
+          </span>
+        ) : (
+          <span style={{ fontSize: 11, color: '#444' }}>{nodeCount} nodes · {edgeCount} edges</span>
+        )}
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 10, color: '#2a2a2a', fontStyle: 'italic' }}>scroll=zoom · drag=pan</span>
+        {/* View toggle */}
+        <div style={{ display: 'flex', border: '1px solid #3e3e42', borderRadius: 4, overflow: 'hidden' }}>
+          {(['graph', 'arch'] as const).map(v => (
+            <button key={v} onClick={() => setMapView(v)} style={{
+              background: mapView === v ? 'rgba(79,195,247,.15)' : 'transparent',
+              border: 'none', borderRight: v === 'graph' ? '1px solid #3e3e42' : 'none',
+              color: mapView === v ? '#4fc3f7' : '#555',
+              fontSize: 10, padding: '3px 10px', cursor: 'pointer',
+              fontFamily: 'inherit', fontWeight: mapView === v ? 700 : 400,
+              letterSpacing: '.04em', textTransform: 'uppercase',
+            }}>{v === 'graph' ? 'Graph' : 'Arch'}</button>
+          ))}
+        </div>
         <div style={{ width: 1, height: 18, background: '#3e3e42', margin: '0 2px' }} />
+        {mapView === 'graph' && <span style={{ fontSize: 10, color: '#2a2a2a', fontStyle: 'italic' }}>scroll=zoom · drag=pan</span>}
+        {mapView === 'graph' && <div style={{ width: 1, height: 18, background: '#3e3e42', margin: '0 2px' }} />}
+
         <button onClick={handleScanProject} disabled={scanning}
           style={{
             background: 'rgba(255,255,255,.05)', border: '1px solid #3e3e42',
@@ -225,23 +296,33 @@ export function MindMapPanel() {
       </div>
 
       {/* Canvas */}
-      <div ref={containerRef} style={{ position: 'absolute', top: 36, left: 0, right: 0, bottom: 0 }}>
-        <ForceCanvas
-          data={mindMapData}
-          width={dimensions.w}
-          height={Math.max(1, dimensions.h)}
-          selectedId={selectedId}
-          expandingIds={expandingIds}
-          onNodeSelect={handleNodeSelect}
-          onNodeExpand={handleNodeExpand}
-          onNodeCollapse={handleNodeCollapse}
-          onPositionsCommit={handlePositionsCommit}
-          onSymbolClick={handleSymbolClick}
-        />
+      <div ref={containerRef} style={{ position: 'absolute', top: 36, left: 0, right: 0, bottom: 0, display: 'flex' }}>
+        {mapView === 'graph' ? (
+          <ForceCanvas
+            data={mindMapData}
+            width={dimensions.w}
+            height={Math.max(1, dimensions.h)}
+            selectedId={selectedId}
+            expandingIds={expandingIds}
+            onNodeSelect={handleNodeSelect}
+            onNodeExpand={handleNodeExpand}
+            onNodeCollapse={handleNodeCollapse}
+            onPositionsCommit={handlePositionsCommit}
+            onSymbolClick={handleSymbolClick}
+          />
+        ) : (
+          <ArchPanel
+            data={mindMapData}
+            projectRoot={projectRoot}
+            onAnalyzeFolder={handleAnalyzeFolder}
+            folderScanning={scanning}
+            scanProgress={scanProgress}
+          />
+        )}
       </div>
 
-      {/* Legend */}
-      <div style={{
+      {/* Legend — graph view only */}
+      {mapView === 'graph' && <div style={{
         position: 'absolute', bottom: 16, left: 16, zIndex: 10,
         background: 'rgba(18,18,20,.92)', border: '1px solid #2e2e32',
         borderRadius: 8, padding: '10px 14px', backdropFilter: 'blur(8px)',
@@ -259,9 +340,9 @@ export function MindMapPanel() {
             {r.label}
           </div>
         ))}
-      </div>
+      </div>}
 
-      {/* Pseudo panel */}
+      {/* Pseudo panel — graph view only */}
       <AnimatePresence>
         {pseudoState && (
           <PseudoPanel

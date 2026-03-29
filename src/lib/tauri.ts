@@ -39,6 +39,10 @@ export async function generateFileSummary(path: string, content: string): Promis
   return invoke<string>('generate_file_summary', { path, content })
 }
 
+export async function runClaudePrompt(prompt: string): Promise<string> {
+  return invoke<string>('run_claude_prompt', { prompt })
+}
+
 export async function saveContextFiles(
   projectRoot: string,
   filePath: string,

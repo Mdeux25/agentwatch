@@ -173,12 +173,7 @@ export function MapNodeEl({
             <text x={-hw + 24} y={sy} fontSize={10.5} dominantBaseline="middle"
               fill={hovered ? '#e2e8f0' : '#9ca3af'} fontFamily="monospace"
               style={{ pointerEvents: 'none' }}>
-              {sym.name.length > 14 ? sym.name.slice(0, 13) + '…' : sym.name}
-            </text>
-            <text x={hw - 20} y={sy} fontSize={8} textAnchor="end"
-              dominantBaseline="middle" fill={meta.color + '99'} fontFamily="monospace"
-              style={{ pointerEvents: 'none' }}>
-              {sym.kind}
+              {sym.name.length > 18 ? sym.name.slice(0, 17) + '…' : sym.name}
             </text>
             {hasPseudo && (
               <text x={hw - 8} y={sy} fontSize={9} textAnchor="end"

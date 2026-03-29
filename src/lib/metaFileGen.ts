@@ -1,6 +1,5 @@
 import { parseSymbols, extractPseudo } from './symbolParser'
 import type { FileSymbol } from '../types/events'
-import type { PseudoLine } from '../types/mindMap'
 
 // ── Import parsing (subset of mindMapBuilder, inline to avoid coupling) ────────
 
@@ -52,10 +51,6 @@ const KIND_ICON: Record<string, string> = {
   function:'ƒ', class:'c', type:'T', variable:'◉',
 }
 
-const PSEUDO_COLOR: Record<PseudoLine['t'], string> = {
-  comment:'#3d5a45', keyword:'#818cf8', assign:'#9ca3af',
-  call:'#38bdf8', arrow:'#f97316', param:'#d4a96a',
-}
 
 // ── HTML summary ──────────────────────────────────────────────────────────────
 

@@ -311,7 +311,7 @@ export default function App() {
           timestamp: event.timestamp,
           date: new Date(event.timestamp).toLocaleDateString('en-CA'),
           projectRoot: state.projectRoot ?? '',
-          projectName: (state.projectRoot ?? '').split('/').at(-1) ?? 'unknown',
+          projectName: (state.projectRoot ?? '').split('/').pop() ?? 'unknown',
           sessionId: state.sessionId ?? 'unknown',
           taskIndex: state.events.filter(e => e.type === 'user_message').length - 1,
           taskPrompt: (lastUserMsg?.message ?? '').slice(0, 100),
@@ -769,7 +769,7 @@ export default function App() {
                 {contextHtml && (
                   <div
                     className={`ide-tab ${editorTab === 'summary' ? 'active' : ''}`}
-                    onClick={() => setEditorTab('context')}
+                    onClick={() => setEditorTab('summary')}
                     style={{ cursor: 'pointer', gap: 5 }}
                   >
                     <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.7 }}>

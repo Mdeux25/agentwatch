@@ -139,69 +139,90 @@ export function parseSymbols(content: string, ext: string): FileSymbol[] {
 
 // ─── Pseudo-code extraction ───────────────────────────────────────────────────
 
-/**
- * Extract 4–8 pseudo-code lines from a function body starting at `startLine`.
- * Uses the next symbol's line (or startLine + 40) as the end bound.
- */
+const trunc = (s: string, n: number) => s.length > n ? s.slice(0, n) + '…' : s
+
 export function extractPseudo(
   contentLines: string[],
   startLine: number,   // 1-based
   endLine: number,     // 1-based exclusive upper bound
 ): PseudoLine[] {
   const body = contentLines
-    .slice(startLine, Math.min(endLine, startLine + 40))
+    .slice(startLine, Math.min(endLine, startLine + 50))
     .map(l => l.trim())
-    .filter(l => l.length > 0 && l !== '{' && l !== '}' && l !== '};')
+    .filter(l => l.length > 0 && !/^[{}()\[\];,]$/.test(l) && l !== '};' && l !== ');')
 
   const result: PseudoLine[] = []
 
   for (const raw of body) {
-    if (result.length >= 7) break
+    if (result.length >= 5) break
+
+    // Skip closing-bracket-only lines
+    if (/^[}\])]/.test(raw)) continue
 
     // Comments
     if (raw.startsWith('//') || raw.startsWith('/*') || raw.startsWith('*')) {
-      const text = raw.replace(/^\/\/\s*|^\/?\*+\s*/g, '')
-      if (text.length > 2) result.push({ t: 'comment', l: '// ' + text.slice(0, 50) })
+      const text = raw.replace(/^\/\/\s*|^\/?\*+\s*/g, '').trim()
+      if (text.length > 2) result.push({ t: 'comment', l: trunc('// ' + text, 54) })
       continue
     }
 
-    // Guards / control flow
-    if (/^(if|else|return|throw|switch|case|break|continue|for|while)\b/.test(raw)) {
-      const clean = raw.replace(/[{}]/g, '').slice(0, 52)
-      result.push({ t: 'keyword', l: clean })
+    // return
+    if (/^return\b/.test(raw)) {
+      const val = raw.replace(/^return\s*/, '').replace(/;$/, '').trim()
+      result.push({ t: 'arrow', l: trunc('→ ' + (val || 'void'), 54) })
       continue
     }
 
-    // Async calls / HTTP / await
-    if (/\bawait\b|\bfetch\b|\baxios\b|\binvoke\b/.test(raw) ||
-        /\.(get|post|put|delete|patch)\s*\(/.test(raw)) {
-      const clean = raw.slice(0, 52).replace(/[{}]/g, '')
-      result.push({ t: 'call', l: clean })
+    // throw
+    if (/^throw\b/.test(raw)) {
+      const val = raw.replace(/^throw(?:\s+new)?\s+/, '').replace(/;$/, '')
+      result.push({ t: 'keyword', l: trunc('throw ' + val, 54) })
       continue
     }
 
-    // Result of awaited call (arrow assignment)
-    if (/=\s*await\b/.test(raw) || /^\w+\s*=/.test(raw) && /\(/.test(raw)) {
-      const name = (raw.match(/^(\w+)\s*=/) ?? [])[1] ?? ''
-      const rhs = raw.replace(/^.*?=\s*/, '').slice(0, 40)
-      result.push({ t: 'arrow', l: `→ ${name ? name + ' = ' : ''}${rhs}` })
+    // if / else if / else / for / while / switch
+    if (/^(if|else if|else|for|while|switch)\b/.test(raw)) {
+      const m = raw.match(/^(if|else if|else|for|while|switch)\s*\(?([^{)]*)\)?/)
+      if (m) {
+        const kw = m[1], cond = (m[2] ?? '').trim()
+        result.push({ t: 'keyword', l: trunc(cond ? `${kw} (${cond})` : kw, 54) })
+      }
       continue
     }
 
-    // State / simple assignments
-    if (/^(?:const|let|var|this\.|self\.)?\s*\w+\s*[+\-*]?=/.test(raw) && !/=>/.test(raw)) {
-      result.push({ t: 'assign', l: raw.slice(0, 52) })
+    // Destructuring: const { a, b } = src  or  const [a] = src
+    const destruct = raw.match(/^(?:const|let|var)\s+([\[{][^=\n]{1,40}[\]}])\s*=\s*(.+?)\s*;?$/)
+    if (destruct) {
+      const vars = destruct[1].replace(/\s+/g, ' ')
+      const src  = destruct[2].replace(/\s+/g, ' ')
+      result.push({ t: 'assign', l: trunc(`${vars} = ${src}`, 54) })
       continue
     }
 
-    // Multi-param continuation lines (starts with identifier then comma or colon)
-    if (/^\w+[\w.]*[,:]\s/.test(raw) || raw.startsWith('}') || raw.startsWith(')')) {
-      continue // skip closing braces
+    // await assignment: const x = await fn(...)  or  x = await fn(...)
+    const awaitAssign = raw.match(/^(?:const|let|var)?\s*(\w+)\s*=\s*await\s+(.+?)\s*;?$/)
+    if (awaitAssign) {
+      result.push({ t: 'call', l: trunc(`${awaitAssign[1]} ← await ${awaitAssign[2]}`, 54) })
+      continue
     }
 
-    // Generic — treat as param/misc
-    if (raw.length > 4) {
-      result.push({ t: 'param', l: raw.slice(0, 52) })
+    // bare await: await fn(...)
+    if (/^await\b/.test(raw)) {
+      result.push({ t: 'call', l: trunc(raw.replace(/;$/, ''), 54) })
+      continue
+    }
+
+    // simple assignment: const x = expr (no arrow fn)
+    const assign = raw.match(/^(?:const|let|var)\s+(\w+)\s*=\s*(.+?)\s*;?$/)
+    if (assign && !/=>/.test(assign[2])) {
+      result.push({ t: 'assign', l: trunc(`${assign[1]} = ${assign[2]}`, 54) })
+      continue
+    }
+
+    // function call as statement: foo(...)  or  obj.foo(...)
+    if (/^[\w.]+\s*\(/.test(raw) && !/^(?:function|class|if|for|while)\b/.test(raw)) {
+      result.push({ t: 'call', l: trunc(raw.replace(/;$/, ''), 54) })
+      continue
     }
   }
 

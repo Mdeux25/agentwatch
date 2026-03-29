@@ -536,6 +536,23 @@
   pointer-events: none; position: absolute; inset: 0;
 }
 
+@keyframes archShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes archSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes archSweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+@keyframes archDots {
+  0%   { content: '·'; }
+  33%  { content: '··'; }
+  66%  { content: '···'; }
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
 @layer utilities {
   .scrollbar-thin::-webkit-scrollbar { width: 4px; }

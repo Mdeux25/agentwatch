@@ -89,9 +89,12 @@ export function buildFileMapDelta(
   const rawSymbols = parseSymbols(content, ext)
   const lines = content.split('\n')
 
+  // Functions only, cap at 6
+  const fnSymbols = rawSymbols.filter(s => s.kind === 'function').slice(0, 6)
+
   // Attach pseudo-code to each symbol
-  const symbols = rawSymbols.map((sym, i) => {
-    const nextLine = rawSymbols[i + 1]?.line ?? sym.line + 40
+  const symbols = fnSymbols.map((sym, i) => {
+    const nextLine = fnSymbols[i + 1]?.line ?? sym.line + 40
     const pseudo = extractPseudo(lines, sym.line, nextLine)
     return { ...sym, pseudo }
   })

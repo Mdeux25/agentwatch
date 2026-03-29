@@ -177,6 +177,26 @@ fn save_context_files(
     Ok(())
 }
 
+// ── Generic claude -p runner ──────────────────────────────────────────────────
+
+#[tauri::command]
+async fn run_claude_prompt(prompt: String) -> Result<String, String> {
+    let claude = find_claude_bin()?;
+    let output = tokio::process::Command::new(&claude)
+        .args(["-p", "--dangerously-skip-permissions", &prompt])
+        .output()
+        .await
+        .map_err(|e| e.to_string())?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() {
+        Ok(stdout)
+    } else {
+        let msg = if stdout.is_empty() { stderr } else if stderr.is_empty() { stdout } else { format!("{stderr}\n{stdout}") };
+        Err(msg)
+    }
+}
+
 // ── File summary via claude -p ────────────────────────────────────────────────
 
 fn find_claude_bin() -> Result<String, String> {
@@ -234,6 +254,7 @@ pub fn run() {
             load_usage_records,
             save_context_files,
             generate_file_summary,
+            run_claude_prompt,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
