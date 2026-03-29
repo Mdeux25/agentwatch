@@ -78,6 +78,7 @@ The app runs Claude Code as a subprocess and streams its events (tool use, think
 - **Recent projects** — native folder picker with recent project list on first launch.
 - **Symbol navigation** — functions, classes, and variables extracted from open files as clickable chips.
 - **Font size control** — A- / A+ buttons scale all scene labels globally.
+- **Usage dashboard** — token usage and USD cost tracked per task, per project, per day, monthly, and all-time. Persists to `~/.agentwatch/usage.jsonl` across sessions. Includes a 7-day cost bar chart, per-task input/output token split bars, and a project breakdown donut chart.
 
 ---
 

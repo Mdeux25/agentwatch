@@ -9,6 +9,8 @@ pub struct FrontendEvent {
     pub data: Option<Value>,
     pub timestamp: u64,
     pub session_id: Option<String>,
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
 }
 
 pub fn now_ms() -> u64 {
@@ -42,6 +44,8 @@ pub fn parse_line(line: &str) -> Option<FrontendEvent> {
                 data: Some(v.clone()),
                 timestamp: ts,
                 session_id: extract_session_id(&v),
+                input_tokens: None,
+                output_tokens: None,
             })
         }
 
@@ -77,6 +81,8 @@ pub fn parse_line(line: &str) -> Option<FrontendEvent> {
                 data: input,
                 timestamp: ts,
                 session_id: extract_session_id(&v),
+                input_tokens: None,
+                output_tokens: None,
             })
         }
 
@@ -93,20 +99,27 @@ pub fn parse_line(line: &str) -> Option<FrontendEvent> {
                     data: None,
                     timestamp: ts,
                     session_id,
+                    input_tokens: None,
+                    output_tokens: None,
                 });
             }
 
-            // Emit as assistant_message so it shows with the Claude style,
-            // then follow with a no-text result marker so the UI knows it's done.
-            // We emit TWO events here — the response text, then the done marker.
-            // Caller handles both via the Vec trick; for simplicity return the
-            // text event (the done marker is implicit from isProcessing=false).
+            // Extract token usage from the result event
+            let input_tokens = v.get("usage")
+                .and_then(|u| u.get("input_tokens"))
+                .and_then(|t| t.as_u64());
+            let output_tokens = v.get("usage")
+                .and_then(|u| u.get("output_tokens"))
+                .and_then(|t| t.as_u64());
+
             Some(FrontendEvent {
                 event_type: "assistant_message".into(),
                 message: text,
                 data: None,
                 timestamp: ts,
                 session_id,
+                input_tokens,
+                output_tokens,
             })
         }
 

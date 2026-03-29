@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>App.vue — Mind Map + Blueprint · AgentWatch</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#1e1e1e; color:#ccc;
+  font-family:'JetBrains Mono','Fira Code',ui-monospace,monospace;
+  overflow:hidden; height:100vh;
+  display:flex; flex-direction:column;
+  user-select:none;
+}
+
+/* ── Toolbar ── */
+#toolbar {
+  height:36px; background:#252526; border-bottom:1px solid #3e3e42;
+  display:flex; align-items:center; padding:0 12px; gap:8px; flex-shrink:0;
+}
+.tb-label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#555; }
+.tb-file { font-size:12px; color:#4ade80; font-weight:600; }
+.tb-sep { width:1px; height:18px; background:#3e3e42; margin:0 2px; }
+.tb-btn {
+  background:rgba(255,255,255,.05); border:1px solid #3e3e42;
+  border-radius:4px; color:#9ca3af; font-size:11px;
+  padding:3px 10px; cursor:pointer; font-family:inherit; transition:all .12s;
+}
+.tb-btn:hover { background:rgba(255,255,255,.1); color:#e2e8f0; }
+.tb-btn.active { background:rgba(79,195,247,.12); border-color:#4fc3f7; color:#4fc3f7; }
+.tb-spacer { flex:1; }
+.tb-pill {
+  display:flex; align-items:center; gap:0; border:1px solid #3e3e42;
+  border-radius:4px; overflow:hidden;
+}
+.tb-pill button {
+  background:rgba(255,255,255,.04); border:none; color:#666;
+  font-size:11px; padding:3px 10px; cursor:pointer; font-family:inherit;
+  transition:all .12s;
+}
+.tb-pill button.active { background:rgba(99,102,241,.2); color:#a5b4fc; }
+.tb-pill button:hover:not(.active) { background:rgba(255,255,255,.08); color:#9ca3af; }
+
+/* ── Pseudo-code panel ── */
+#pseudo-panel {
+  position:fixed; z-index:1000; width:290px;
+  background:#13131a; border:1px solid #3e3e42; border-radius:8px;
+  font-family:'JetBrains Mono','Fira Code',ui-monospace,monospace;
+  box-shadow:0 8px 40px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.04);
+  opacity:0; pointer-events:none;
+  transform:translateX(-6px) scale(.98);
+  transition:opacity .14s, transform .14s;
+}
+#pseudo-panel.visible { opacity:1; pointer-events:auto; transform:translateX(0) scale(1); }
+.pp-header {
+  padding:9px 12px 7px; border-bottom:1px solid #1f1f28;
+  display:flex; align-items:center; gap:8px;
+}
+.pp-badge { font-size:8px; font-weight:700; letter-spacing:.08em; padding:2px 7px; border-radius:3px; flex-shrink:0; }
+.pp-name  { font-size:11px; font-weight:600; color:#e2e8f0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pp-close { background:none; border:none; color:#444; font-size:16px; cursor:pointer; padding:0; line-height:1; flex-shrink:0; transition:color .1s; }
+.pp-close:hover { color:#9ca3af; }
+.pp-body  { padding:10px 14px 12px; display:flex; flex-direction:column; gap:1px; }
+.pp-line  { font-size:10px; line-height:1.75; white-space:pre; }
+.pl-comment { color:#3d5a45; font-style:italic; }
+.pl-keyword { color:#818cf8; }
+.pl-arrow   { color:#f97316; }
+.pl-call    { color:#38bdf8; }
+.pl-assign  { color:#9ca3af; }
+.pl-param   { color:#d4a96a; }
+.pl-empty   { height:5px; display:block; }
+
+/* ── Workspace split ── */
+#workspace { flex:1; display:flex; overflow:hidden; }
+
+/* ── Mind map pane ── */
+#mm-pane {
+  flex:1; position:relative; overflow:hidden;
+  background:radial-gradient(ellipse at 50% 50%,#1e2130 0%,#1a1a1e 60%,#171719 100%);
+}
+#mm-canvas { width:100%; height:100%; display:block; }
+
+/* ── Resize handle ── */
+#resize-h {
+  width:4px; flex-shrink:0; background:#252526; cursor:col-resize;
+  border-left:1px solid #3e3e42; transition:background .12s;
+}
+#resize-h:hover { background:#4fc3f7; }
+
+/* ── Blueprint pane ── */
+#bp-pane {
+  width:400px; flex-shrink:0; display:flex; flex-direction:column;
+  border-left:1px solid #3e3e42; background:#16161a; overflow:hidden;
+}
+#bp-toolbar {
+  height:34px; background:#1e1e20; border-bottom:1px solid #2e2e32;
+  display:flex; align-items:center; padding:0 12px; gap:8px; flex-shrink:0;
+}
+.bp-label { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#444; }
+.bp-file { font-size:11px; color:#818cf8; }
+#bp-scroll { flex:1; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; align-items:center; padding:20px 12px 24px; gap:16px; }
+#bp-scroll::-webkit-scrollbar { width:4px; }
+#bp-scroll::-webkit-scrollbar-track { background:transparent; }
+#bp-scroll::-webkit-scrollbar-thumb { background:#2e2e32; border-radius:2px; }
+
+/* Blueprint SVG */
+#bp-svg { display:block; }
+
+/* Component highlight when linked */
+.bp-comp { transition:opacity .15s; cursor:default; }
+.bp-comp.dimmed { opacity:.3; }
+.bp-comp.lit rect, .bp-comp.lit path { filter:brightness(1.6); }
+
+/* Annotation sidebar */
+#bp-annotations { width:100%; }
+.ann-row {
+  display:flex; align-items:center; gap:8px;
+  padding:4px 0; border-bottom:1px solid rgba(255,255,255,.04);
+}
+.ann-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+.ann-name { font-size:10px; color:#6b7280; flex:1; }
+.ann-comp { font-size:10px; color:#374151; font-style:italic; }
+
+/* Legend */
+#mm-legend {
+  position:absolute; bottom:16px; left:16px;
+  background:rgba(18,18,20,.92); border:1px solid #2e2e32; border-radius:8px;
+  padding:10px 14px; font-size:10px; backdrop-filter:blur(8px);
+}
+.legend-title { color:#444; font-size:9px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:7px; }
+.legend-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; color:#555; }
+.legend-row:last-child { margin-bottom:0; }
+.lg-box { width:12px; height:12px; border-radius:3px; flex-shrink:0; }
+.lg-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin:0 2px; }
+#zoom-badge {
+  position:absolute; bottom:16px; right:16px;
+  background:rgba(18,18,20,.8); border:1px solid #2e2e32; border-radius:6px;
+  padding:4px 10px; font-size:10px; color:#444; font-family:monospace;
+}
+#toast {
+  position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
+  background:#2a2a2b; border:1px solid #4fc3f7; border-radius:6px;
+  padding:8px 18px; font-size:11px; color:#9ca3af; z-index:999;
+  pointer-events:none; opacity:0; transition:opacity .2s;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top toolbar ─────────────────────────────────────────────────────────── -->
+<div id="toolbar">
+  <span class="tb-label">◈ Mind Map</span>
+  <div class="tb-sep"></div>
+  <span class="tb-file">newsly / frontend / src / App.vue</span>
+  <div class="tb-sep"></div>
+  <button class="tb-btn" onclick="resetLayout()">⟳ Reset</button>
+  <button class="tb-btn" onclick="zoomBy(1.25)">⊕</button>
+  <button class="tb-btn" onclick="zoomBy(0.8)">⊖</button>
+  <div class="tb-spacer"></div>
+  <span style="font-size:10px;color:#3d3d3d;font-style:italic;">scroll=zoom · drag bg=pan · drag nodes</span>
+</div>
+
+<!-- ── Workspace ───────────────────────────────────────────────────────────── -->
+<div id="workspace">
+
+  <!-- Mind map pane -->
+  <div id="mm-pane">
+    <svg id="mm-canvas" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+          <path d="M0,.5L0,5.5L6.5,3z" fill="rgba(255,255,255,.18)"/>
+        </marker>
+        <marker id="arr-npm" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto">
+          <path d="M0,.5L0,5.5L6.5,3z" fill="rgba(99,102,241,.5)"/>
+        </marker>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <g id="static-grid"></g>
+      <g id="mm-vp">
+        <g id="mm-edges"></g>
+        <g id="mm-nodes"></g>
+      </g>
+    </svg>
+
+    <div id="mm-legend">
+      <div class="legend-title">Legend</div>
+      <div class="legend-row"><div class="lg-box" style="background:rgba(255,255,255,.05);border:1.5px solid #4ade80;"></div>Explored file</div>
+      <div class="legend-row"><div class="lg-box" style="background:#0f0f0f;border:1px dashed #444;"></div>Unexplored — click to open</div>
+      <div class="legend-row"><div class="lg-box" style="background:rgba(99,102,241,.1);border:1px solid #4f46e5;"></div>npm package</div>
+      <div class="legend-row"><div class="lg-dot" style="background:#3b82f6;"></div>async fn</div>
+      <div class="legend-row"><div class="lg-dot" style="background:#60a5fa;"></div>function</div>
+      <div class="legend-row"><div class="lg-dot" style="background:#8b5cf6;"></div>computed</div>
+      <div class="legend-row"><div class="lg-dot" style="background:#06b6d4;"></div>ref/reactive</div>
+    </div>
+    <div id="zoom-badge">100%</div>
+  </div>
+
+  <!-- Resize handle -->
+  <div id="resize-h" id="resize-h"></div>
+
+  <!-- Blueprint pane -->
+  <div id="bp-pane">
+    <div id="bp-toolbar">
+      <span class="bp-label">⊡ UI Blueprint</span>
+      <div class="tb-sep"></div>
+      <span class="bp-file">App.vue</span>
+      <div class="tb-spacer"></div>
+      <div class="tb-pill">
+        <button id="btn-mobile" class="active" onclick="setDevice('mobile')">📱 Mobile</button>
+        <button id="btn-desktop" onclick="setDevice('desktop')">🖥 Desktop</button>
+      </div>
+    </div>
+    <div id="bp-scroll">
+      <svg id="bp-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="bp-annotations"></div>
+    </div>
+  </div>
+
+</div><!-- /workspace -->
+
+<div id="pseudo-panel"></div>
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// MIND MAP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const EXT_COLOR = { vue:'#4ade80', js:'#eab308', ts:'#3b82f6', jsx:'#f97316', tsx:'#818cf8' }
+const KIND_COLOR = { async:'#3b82f6', function:'#60a5fa', computed:'#8b5cf6', ref:'#06b6d4' }
+const NW=178, NH_HDR=36, NH_SYM=21, NH_BB=44, NH_EXT=40, NH_PAD=10
+const NS='http://www.w3.org/2000/svg'
+
+const mmNodes = [
+  { id:'App.vue', label:'App.vue', kind:'file', ext:'vue', active:true, explored:true,
+    symbols:[
+      {name:'fetchNews',kind:'async',pseudo:[
+        {t:'comment',l:'// reset pagination on filter change'},
+        {t:'keyword',l:'if resetPage → page = 1, replace = true'},
+        {t:'assign', l:'isLoading = true'},
+        {t:'param',  l:'params = { topic, language, hours,'},
+        {t:'param',  l:'          limit, offset, smartSearch,'},
+        {t:'param',  l:'          country?, region? }'},
+        {t:'call',   l:'GET /api/news?params'},
+        {t:'arrow',  l:'→ articles = paginate or append'},
+        {t:'arrow',  l:'→ lastUpdate = Date.now()'},
+      ]},
+      {name:'fetchSocialFeed',kind:'async',pseudo:[
+        {t:'assign', l:'socialLoading = true'},
+        {t:'call',   l:'GET /api/social'},
+        {t:'param',  l:'  { platform: "all", limit: 30 }'},
+        {t:'arrow',  l:'→ socialItems = res.data.items'},
+      ]},
+      {name:'debouncedFetchNews',kind:'function',pseudo:[
+        {t:'comment',l:'// prevents map event race conditions'},
+        {t:'call',   l:'clearTimeout(_fetchTimer)'},
+        {t:'keyword',l:'_fetchTimer = setTimeout(60ms)'},
+        {t:'arrow',  l:'  → fetchNews(reset)'},
+      ]},
+      {name:'scrollToSocialCard',kind:'function',pseudo:[
+        {t:'assign', l:'cards = DOM .tweet-card, .video-card…'},
+        {t:'keyword',l:'clamp index to [0, cards.length-1]'},
+        {t:'keyword',l:'if RTL → scroll by -ve offset'},
+        {t:'arrow',  l:'else  → card.offsetLeft smooth scroll'},
+      ]},
+      {name:'handleInstallClick',kind:'function',pseudo:[
+        {t:'keyword',l:'if hasInstallPrompt'},
+        {t:'arrow',  l:'  → installApp()   // native PWA'},
+        {t:'keyword',l:'else if isIosDevice'},
+        {t:'arrow',  l:'  → showIosInstallHint = true'},
+      ]},
+      {name:'goToSummary',kind:'function',pseudo:[
+        {t:'keyword',l:'if unlocked === "permanent"'},
+        {t:'arrow',  l:'  → activeTab = "summary"'},
+        {t:'keyword',l:'else if articleViewCount < threshold'},
+        {t:'arrow',  l:'  → activeTab = "summary"'},
+        {t:'keyword',l:'else'},
+        {t:'arrow',  l:'  → showSubscribeModal = true'},
+      ]},
+      {name:'socialItemsFiltered',kind:'computed',pseudo:[
+        {t:'keyword',l:'if socialPlatform === "all"'},
+        {t:'arrow',  l:'  return socialItems'},
+        {t:'assign', l:'return socialItems.filter(item =>'},
+        {t:'assign', l:'  item.platform === socialPlatform)'},
+      ]},
+      {name:'canInstall',kind:'computed',pseudo:[
+        {t:'arrow',  l:'return !isInstalled'},
+        {t:'assign', l:'    && (hasInstallPrompt'},
+        {t:'assign', l:'       || isIosDevice)'},
+      ]},
+      {name:'activeTab',kind:'ref',pseudo:[
+        {t:'assign', l:'ref("news")'},
+        {t:'comment',l:'// "news"|"rss"|"social"'},
+        {t:'comment',l:'// |"summary"|"about"'},
+        {t:'comment',l:'// drives tab panel render'},
+      ]},
+      {name:'articles',kind:'ref',pseudo:[
+        {t:'assign', l:'ref([])  // NewsCard[]'},
+        {t:'comment',l:'// reset on fetchNews(true)'},
+        {t:'comment',l:'// append on scroll pagination'},
+        {t:'comment',l:'// sorted by publishedAt desc'},
+      ]},
+    ],
+    x:500,y:360 },
+  {id:'NewsCard.vue',      label:'NewsCard.vue',         kind:'file',ext:'vue',explored:false,x:800,y:170},
+  {id:'TweetCard.vue',     label:'TweetCard.vue',         kind:'file',ext:'vue',explored:false,x:840,y:290},
+  {id:'VideoCard.vue',     label:'VideoCard.vue',         kind:'file',ext:'vue',explored:false,x:830,y:410},
+  {id:'SearchBar.vue',     label:'SearchBar.vue',         kind:'file',ext:'vue',explored:false,x:790,y:530},
+  {id:'LiveIndicator.vue', label:'LiveIndicator.vue',     kind:'file',ext:'vue',explored:false,x:680,y:620},
+  {id:'NewsMap.vue',       label:'NewsMap.vue',           kind:'file',ext:'vue',explored:false,async:true,x:530,y:650},
+  {id:'NewsSummary.vue',   label:'NewsSummary.vue',       kind:'file',ext:'vue',explored:false,x:380,y:650},
+  {id:'UserProfile.vue',   label:'UserProfile.vue',       kind:'file',ext:'vue',explored:false,x:240,y:610},
+  {id:'AppFooter.vue',     label:'AppFooter.vue',         kind:'file',ext:'vue',explored:false,x:150,y:490},
+  {id:'Pagination.vue',    label:'Pagination.vue',        kind:'file',ext:'vue',explored:false,x:130,y:370},
+  {id:'AdUnit.vue',        label:'AdUnit.vue',            kind:'file',ext:'vue',explored:false,x:160,y:250},
+  {id:'LocationCluster.vue',label:'LocationCluster.vue',  kind:'file',ext:'vue',explored:false,x:230,y:150},
+  {id:'useAuth.js',        label:'useAuth.js',            kind:'file',ext:'js', explored:false,x:390,y:100},
+  {id:'analytics.js',      label:'analytics.js',          kind:'file',ext:'js', explored:false,x:510,y:80},
+  {id:'topicMap.js',       label:'topicMap.js',           kind:'file',ext:'js', explored:false,x:640,y:100},
+  {id:'i18n.js',           label:'i18n.js',               kind:'file',ext:'js', explored:false,x:290,y:110},
+  {id:'vue',               label:'vue',                   kind:'external',ext:'npm',x:220,y:370},
+  {id:'axios',             label:'axios',                 kind:'external',ext:'npm',x:260,y:260},
+]
+mmNodes.forEach(n=>{n.vx=0;n.vy=0})
+
+const mmEdges=[
+  {s:'App.vue',t:'NewsCard.vue'},{s:'App.vue',t:'TweetCard.vue'},{s:'App.vue',t:'VideoCard.vue'},
+  {s:'App.vue',t:'SearchBar.vue'},{s:'App.vue',t:'LiveIndicator.vue'},{s:'App.vue',t:'NewsMap.vue'},
+  {s:'App.vue',t:'NewsSummary.vue'},{s:'App.vue',t:'UserProfile.vue'},{s:'App.vue',t:'AppFooter.vue'},
+  {s:'App.vue',t:'Pagination.vue'},{s:'App.vue',t:'AdUnit.vue'},{s:'App.vue',t:'LocationCluster.vue'},
+  {s:'App.vue',t:'useAuth.js'},{s:'App.vue',t:'analytics.js'},{s:'App.vue',t:'topicMap.js'},
+  {s:'App.vue',t:'i18n.js'},{s:'App.vue',t:'vue'},{s:'App.vue',t:'axios'},
+]
+
+const mmNodeIdx={}; mmNodes.forEach(n=>mmNodeIdx[n.id]=n)
+
+function svgEl(tag,attrs={}){
+  const e=document.createElementNS(NS,tag)
+  for(const[k,v]of Object.entries(attrs))e.setAttribute(k,String(v))
+  return e
+}
+function nodeH(n){
+  if(n.kind==='external')return NH_EXT
+  if(!n.explored)return NH_BB
+  return NH_HDR+(n.symbols?.length||0)*NH_SYM+NH_PAD
+}
+
+let vpX=0,vpY=0,vpS=1
+const mmVP=document.getElementById('mm-vp')
+const zBadge=document.getElementById('zoom-badge')
+function applyVP(){
+  mmVP.setAttribute('transform',`translate(${vpX},${vpY}) scale(${vpS})`)
+  zBadge.textContent=Math.round(vpS*100)+'%'
+}
+function screenToSVG(cx,cy){return{x:(cx-vpX)/vpS,y:(cy-vpY)/vpS}}
+function centerVP(){
+  const s=document.getElementById('mm-canvas')
+  vpX=s.clientWidth/2-500*vpS; vpY=s.clientHeight/2-360*vpS; applyVP()
+}
+
+const mmNodesG=document.getElementById('mm-nodes')
+const mmEdgesG=document.getElementById('mm-edges')
+const mmNodeEls={},mmEdgeEls={}
+
+// node-to-blueprint mapping
+const nodeToBP={
+  'NewsCard.vue':'bp-newscard','TweetCard.vue':'bp-tweetcard','VideoCard.vue':'bp-videocard',
+  'SearchBar.vue':'bp-searchbar','LiveIndicator.vue':'bp-liveindicator','NewsMap.vue':'bp-newsmap',
+  'NewsSummary.vue':'bp-summary','UserProfile.vue':'bp-userprofile','AppFooter.vue':'bp-footer',
+  'Pagination.vue':'bp-pagination','AdUnit.vue':'bp-adunit','LocationCluster.vue':'bp-loccluster',
+}
+
+function renderMMEdge(edge){
+  const isNpm=mmNodeIdx[edge.t]?.kind==='external'
+  const path=svgEl('path',{fill:'none',
+    stroke:isNpm?'rgba(99,102,241,.3)':'rgba(255,255,255,.12)',
+    'stroke-width':1.2,'stroke-dasharray':isNpm?'4 3':'none',
+    'marker-end':isNpm?'url(#arr-npm)':'url(#arr)'})
+  mmEdgeEls[edge.s+'→'+edge.t]=path
+  mmEdgesG.appendChild(path)
+  updateMMEdge(edge)
+}
+function updateMMEdge(edge){
+  const path=mmEdgeEls[edge.s+'→'+edge.t]
+  const src=mmNodeIdx[edge.s],tgt=mmNodeIdx[edge.t]
+  if(!src||!tgt||!path)return
+  const mx=(src.x+tgt.x)/2,my=(src.y+tgt.y)/2
+  const dx=tgt.x-src.x,dy=tgt.y-src.y,len=Math.sqrt(dx*dx+dy*dy)||1
+  path.setAttribute('d',`M${src.x},${src.y} Q${mx-dy/len*40},${my+dx/len*40} ${tgt.x},${tgt.y}`)
+}
+
+function renderMMNode(node){
+  const g=svgEl('g'); g.style.cursor=node.explored?'grab':'pointer'; g.dataset.id=node.id
+  const h=nodeH(node),hw=NW/2,hh=h/2,extColor=EXT_COLOR[node.ext]||'#64748b'
+
+  if(node.kind==='external'){
+    g.appendChild(svgEl('rect',{x:-hw+2,y:-hh+3,width:NW,height:h,rx:7,fill:'rgba(0,0,0,.5)'}))
+    const r=svgEl('rect',{x:-hw,y:-hh,width:NW,height:h,rx:6,fill:'rgba(99,102,241,.08)',stroke:'#4f46e5','stroke-width':1})
+    g.appendChild(r)
+    const t=svgEl('text',{x:-hw+10,y:-hh+14,fill:'#6366f1','font-size':8,'dominant-baseline':'middle','font-family':'monospace'})
+    t.textContent='npm'; g.appendChild(t)
+    const l=svgEl('text',{x:0,y:4,fill:'#818cf8','font-size':12,'text-anchor':'middle','dominant-baseline':'middle','font-family':'monospace','font-weight':700})
+    l.textContent=node.label; g.appendChild(l)
+  } else if(!node.explored){
+    g.appendChild(svgEl('rect',{x:-hw+2,y:-hh+3,width:NW,height:h,rx:7,fill:'rgba(0,0,0,.4)'}))
+    const r=svgEl('rect',{x:-hw,y:-hh,width:NW,height:h,rx:6,fill:'#0f0f0f',stroke:'#3e3e42','stroke-width':1,'stroke-dasharray':'5 3'})
+    g.appendChild(r)
+    ;[.65,.85,.45].forEach((w,i)=>{
+      g.appendChild(svgEl('rect',{x:-hw+10,y:-hh+9+i*10,width:(NW-20)*w,height:5,rx:2,fill:'rgba(255,255,255,.06)'}))
+    })
+    const bw=node.ext.length*6+10
+    g.appendChild(svgEl('rect',{x:hw-bw-6,y:hh-16,width:bw,height:12,rx:3,fill:extColor+'18',stroke:extColor+'44','stroke-width':.5}))
+    const bt=svgEl('text',{x:hw-bw-3,y:hh-9,fill:extColor,'font-size':8,'dominant-baseline':'middle','font-family':'monospace'})
+    bt.textContent='.'+node.ext; g.appendChild(bt)
+    if(node.async){const a=svgEl('text',{x:hw-8,y:-hh+10,fill:'#f97316','font-size':7,'text-anchor':'end','dominant-baseline':'middle','font-family':'monospace'});a.textContent='async';g.appendChild(a)}
+    const l=svgEl('text',{x:0,y:1,fill:'#666','font-size':11,'text-anchor':'middle','dominant-baseline':'middle','font-family':'monospace','font-style':'italic'})
+    l.textContent=node.label; g.appendChild(l)
+    g.addEventListener('mouseenter',()=>{ r.setAttribute('fill','#181818'); highlightBP(nodeToBP[node.id],true) })
+    g.addEventListener('mouseleave',()=>{ r.setAttribute('fill','#0f0f0f'); highlightBP(nodeToBP[node.id],false) })
+    g.addEventListener('click',ev=>{ if(dragMoved)return; showToast('Would open '+node.label+' and expand it') })
+  } else {
+    const h2=nodeH(node),hh2=h2/2
+    const accent=node.active?'#4fc3f7':extColor
+    g.appendChild(svgEl('rect',{x:-hw+3,y:-hh2+4,width:NW,height:h2,rx:7,fill:'rgba(0,0,0,.55)'}))
+    if(node.active){
+      g.appendChild(svgEl('rect',{x:-hw-3,y:-hh2-3,width:NW+6,height:h2+6,rx:9,fill:'none',stroke:'#4fc3f7','stroke-width':2,opacity:.2,filter:'url(#glow)'}))
+    }
+    const rect=svgEl('rect',{x:-hw,y:-hh2,width:NW,height:h2,rx:6,fill:'rgba(255,255,255,.04)',stroke:accent,'stroke-width':node.active?1.5:1})
+    g.appendChild(rect)
+    g.appendChild(svgEl('rect',{x:-hw,y:-hh2,width:4,height:h2,rx:3,fill:extColor,opacity:.85}))
+    const bw=node.ext.length*6+10
+    g.appendChild(svgEl('rect',{x:-hw+10,y:-hh2+10,width:bw,height:15,rx:3,fill:extColor+'28',stroke:extColor+'66','stroke-width':.5}))
+    const bt=svgEl('text',{x:-hw+14,y:-hh2+17,fill:extColor,'font-size':9,'dominant-baseline':'middle','font-family':'monospace','font-weight':600})
+    bt.textContent='.'+node.ext; g.appendChild(bt)
+    const fn=svgEl('text',{x:-hw+10+bw+6,y:-hh2+17,fill:'#e2e8f0','font-size':12,'dominant-baseline':'middle','font-family':'monospace','font-weight':700})
+    fn.textContent=node.label; g.appendChild(fn)
+    g.appendChild(svgEl('line',{x1:-hw+4,y1:-hh2+NH_HDR,x2:hw,y2:-hh2+NH_HDR,stroke:'rgba(255,255,255,.07)','stroke-width':1}))
+    node.symbols?.forEach((sym,i)=>{
+      const sy=-hh2+NH_HDR+4+i*NH_SYM+NH_SYM/2,col=KIND_COLOR[sym.kind]||'#64748b'
+      const icon={async:'⚡',function:'ƒ',computed:'⟳',ref:'◉'}[sym.kind]||'·'
+      const hasPseudo=sym.pseudo&&sym.pseudo.length>0
+      // Hover/click background
+      const rowBg=svgEl('rect',{x:-hw+4,y:sy-NH_SYM/2+1,width:NW-8,height:NH_SYM-2,rx:3,fill:'transparent'})
+      rowBg.style.cursor=hasPseudo?'pointer':'default'
+      g.appendChild(rowBg)
+      g.appendChild(svgEl('circle',{cx:-hw+14,cy:sy,r:3.5,fill:col,opacity:.85}))
+      const it=svgEl('text',{x:-hw+14,y:sy,fill:'#fff','font-size':6.5,'text-anchor':'middle','dominant-baseline':'middle','font-family':'monospace','pointer-events':'none'});it.textContent=icon;g.appendChild(it)
+      const st=svgEl('text',{x:-hw+24,y:sy,fill:'#9ca3af','font-size':10.5,'dominant-baseline':'middle','font-family':'monospace','pointer-events':'none'});st.textContent=sym.name;g.appendChild(st)
+      // Right side: kind + expand hint
+      const kt=svgEl('text',{x:hw-20,y:sy,fill:col+'99','font-size':8,'text-anchor':'end','dominant-baseline':'middle','font-family':'monospace','pointer-events':'none'});kt.textContent=sym.kind;g.appendChild(kt)
+      if(hasPseudo){
+        const arrow=svgEl('text',{x:hw-8,y:sy,fill:'#333','font-size':9,'text-anchor':'end','dominant-baseline':'middle','font-family':'monospace','pointer-events':'none'});arrow.textContent='▸';g.appendChild(arrow)
+        rowBg.addEventListener('mouseenter',()=>{ rowBg.setAttribute('fill','rgba(255,255,255,.06)'); st.setAttribute('fill','#e2e8f0'); arrow.setAttribute('fill','#666') })
+        rowBg.addEventListener('mouseleave',()=>{ rowBg.setAttribute('fill','transparent'); st.setAttribute('fill','#9ca3af'); arrow.setAttribute('fill','#333') })
+        rowBg.addEventListener('click',ev=>{ ev.stopPropagation(); if(dragMoved)return; showPseudoPanel(sym,node,i) })
+      }
+    })
+  }
+
+  mmNodeEls[node.id]=g; mmNodesG.appendChild(g)
+  posMMNode(node); setupMMDrag(g,node)
+}
+
+function posMMNode(n){ const g=mmNodeEls[n.id]; if(g)g.setAttribute('transform',`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`) }
+
+// ── Pseudo-code panel ─────────────────────────────────────────────────────────
+
+function svgToScreen(wx,wy){ return{ x:wx*vpS+vpX, y:wy*vpS+vpY } }
+
+const KIND_META = {
+  async:    { icon:'⚡', bg:'rgba(59,130,246,.15)',  color:'#60a5fa' },
+  function: { icon:'ƒ',  bg:'rgba(96,165,250,.12)',  color:'#93c5fd' },
+  computed: { icon:'⟳', bg:'rgba(139,92,246,.15)',  color:'#a78bfa' },
+  ref:      { icon:'◉', bg:'rgba(6,182,212,.12)',   color:'#22d3ee' },
+}
+
+function showPseudoPanel(sym, node, symIdx) {
+  if(!sym.pseudo||!sym.pseudo.length){ showToast('No pseudo-code for '+sym.name); return }
+  const panel = document.getElementById('pseudo-panel')
+  const meta  = KIND_META[sym.kind] || { icon:'·', bg:'rgba(100,116,139,.1)', color:'#64748b' }
+
+  // SVG world → screen position (right edge of node, at this symbol's row)
+  const symWorldY = node.y - nodeH(node)/2 + NH_HDR + 4 + symIdx*NH_SYM + NH_SYM/2
+  const sc = svgToScreen(node.x + NW/2 + 12, symWorldY - 24)
+
+  const typeMap = { comment:'pl-comment', keyword:'pl-keyword', arrow:'pl-arrow', call:'pl-call', assign:'pl-assign', param:'pl-param' }
+
+  panel.innerHTML = `
+    <div class="pp-header">
+      <span class="pp-badge" style="background:${meta.bg};color:${meta.color};">${meta.icon} ${sym.kind}</span>
+      <span class="pp-name">${sym.name}</span>
+      <button class="pp-close" onclick="hidePseudoPanel()">×</button>
+    </div>
+    <div class="pp-body">
+      ${sym.pseudo.map(l=>`<div class="pp-line ${typeMap[l.t]||'pl-assign'}">${l.l}</div>`).join('')}
+    </div>
+  `
+
+  // Clamp inside viewport
+  const W = window.innerWidth, H = window.innerHeight
+  let x = sc.x, y = sc.y
+  const pw = 296, ph = 60 + sym.pseudo.length * 18
+  if(x + pw > W - 8) x = W - pw - 8
+  if(x < 8) x = 8
+  if(y + ph > H - 8) y = H - ph - 8
+  if(y < 44) y = 44
+
+  panel.style.left = x + 'px'
+  panel.style.top  = y + 'px'
+  panel.classList.add('visible')
+}
+
+function hidePseudoPanel(){
+  document.getElementById('pseudo-panel').classList.remove('visible')
+}
+
+// Dismiss panel when clicking canvas background
+document.addEventListener('click', ev => {
+  if(!ev.target.closest('#pseudo-panel') && !ev.target.closest('#mm-nodes'))
+    hidePseudoPanel()
+}, true)
+
+// Force sim
+let simF=0,maxF=350
+const REP=9000,SPK=0.022,IDEAL=210,DAMP=0.82
+function simTick(){
+  if(simF>=maxF)return; simF++
+  const N=mmNodes.length
+  for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){
+    const a=mmNodes[i],b=mmNodes[j]
+    let dx=a.x-b.x||.01,dy=a.y-b.y||.01,d2=dx*dx+dy*dy,d=Math.sqrt(d2)||1,f=REP/d2
+    a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f
+  }
+  for(const e of mmEdges){
+    const s=mmNodeIdx[e.s],t=mmNodeIdx[e.t]; if(!s||!t)continue
+    const dx=t.x-s.x,dy=t.y-s.y,d=Math.sqrt(dx*dx+dy*dy)||1,str=(d-IDEAL)*SPK,fx=dx/d*str,fy=dy/d*str
+    s.vx+=fx;s.vy+=fy;t.vx-=fx;t.vy-=fy
+  }
+  for(const n of mmNodes){
+    n.vx*=DAMP;n.vy*=DAMP
+    const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy); if(spd>7){n.vx=n.vx/spd*7;n.vy=n.vy/spd*7}
+    n.x+=n.vx;n.y+=n.vy; posMMNode(n)
+  }
+  mmEdges.forEach(e=>updateMMEdge(e))
+  requestAnimationFrame(simTick)
+}
+
+// Drag
+let dragging=null,dragOff={x:0,y:0},dragMoved=false
+function setupMMDrag(g,node){
+  g.addEventListener('mousedown',ev=>{
+    if(ev.button!==0)return; ev.stopPropagation()
+    dragging=node; dragMoved=false; maxF=simF
+    const pt=screenToSVG(ev.clientX,ev.clientY)
+    dragOff={x:pt.x-node.x,y:pt.y-node.y}
+    g.style.cursor='grabbing'
+  })
+}
+window.addEventListener('mousemove',ev=>{
+  if(!dragging)return; dragMoved=true
+  const pt=screenToSVG(ev.clientX,ev.clientY)
+  dragging.x=pt.x-dragOff.x; dragging.y=pt.y-dragOff.y
+  posMMNode(dragging)
+  mmEdges.forEach(e=>{if(e.s===dragging.id||e.t===dragging.id)updateMMEdge(e)})
+})
+window.addEventListener('mouseup',()=>{ if(dragging){const g=mmNodeEls[dragging.id];if(g)g.style.cursor=dragging.explored?'grab':'pointer'} dragging=null })
+
+// Pan/zoom
+let panning=false,panStart={x:0,y:0}
+const mmCanvas=document.getElementById('mm-canvas')
+mmCanvas.addEventListener('mousedown',ev=>{
+  const t=ev.target
+  if(t===mmCanvas||t===mmVP||t===mmEdgesG||t.tagName==='path'||t.tagName==='line'||t.id==='mm-edges'){
+    panning=true; panStart={x:ev.clientX-vpX,y:ev.clientY-vpY}; mmCanvas.style.cursor='grabbing'
+  }
+})
+window.addEventListener('mousemove',ev=>{ if(!panning)return; vpX=ev.clientX-panStart.x; vpY=ev.clientY-panStart.y; applyVP() })
+window.addEventListener('mouseup',()=>{ panning=false; mmCanvas.style.cursor='default' })
+document.getElementById('mm-pane').addEventListener('wheel',ev=>{
+  ev.preventDefault()
+  const f=ev.deltaY<0?1.12:.9,rect=ev.currentTarget.getBoundingClientRect()
+  const mx=ev.clientX-rect.left,my=ev.clientY-rect.top
+  vpX=mx+(vpX-mx)*f; vpY=my+(vpY-my)*f; vpS*=f; applyVP()
+},{passive:false})
+
+function zoomBy(f){
+  const s=document.getElementById('mm-canvas'),cx=s.clientWidth/2,cy=s.clientHeight/2
+  vpX=cx+(vpX-cx)*f; vpY=cy+(vpY-cy)*f; vpS*=f; applyVP()
+}
+function resetLayout(){
+  mmNodes.forEach(n=>{n.vx=(Math.random()-.5)*4;n.vy=(Math.random()-.5)*4})
+  simF=0; maxF=350; requestAnimationFrame(simTick)
+}
+
+// Grid
+function drawGrid(){
+  const g=document.getElementById('static-grid'),s=document.getElementById('mm-canvas')
+  const W=s.clientWidth||1200,H=s.clientHeight||800,step=40
+  for(let x=0;x<W;x+=step)g.appendChild(svgEl('line',{x1:x,y1:0,x2:x,y2:H,stroke:'rgba(255,255,255,.025)','stroke-width':1}))
+  for(let y=0;y<H;y+=step)g.appendChild(svgEl('line',{x1:0,y1:y,x2:W,y2:y,stroke:'rgba(255,255,255,.025)','stroke-width':1}))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BLUEPRINT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Color palette for UI element categories
+const BP_COLORS = {
+  header:   {fill:'rgba(10,12,20,.9)',   stroke:'#334155', label:'#64748b'},
+  map:      {fill:'rgba(2,26,14,.85)',    stroke:'#15803d', label:'#4ade80'},
+  drawer:   {fill:'rgba(14,14,18,.9)',   stroke:'#27272a', label:'#52525b'},
+  nav:      {fill:'rgba(18,18,48,.9)',   stroke:'#3730a3', label:'#818cf8'},
+  card:     {fill:'rgba(10,15,30,.85)',  stroke:'#1e3a5f', label:'#38bdf8'},
+  input:    {fill:'rgba(28,16,4,.85)',   stroke:'#92400e', label:'#fb923c'},
+  user:     {fill:'rgba(30,5,50,.8)',    stroke:'#6d28d9', label:'#a78bfa'},
+  live:     {fill:'rgba(2,22,10,.85)',   stroke:'#166534', label:'#4ade80'},
+  ad:       {fill:'rgba(18,18,18,.8)',   stroke:'#3f3f46', label:'#52525b'},
+  badge:    {fill:'rgba(50,20,0,.8)',    stroke:'#b45309', label:'#f59e0b'},
+  social:   {fill:'rgba(10,20,35,.85)', stroke:'#1d4ed8', label:'#60a5fa'},
+  btn:      {fill:'rgba(20,10,40,.8)',   stroke:'#5b21b6', label:'#8b5cf6'},
+}
+
+// Blueprint elements — coordinates in screen space (0,0 = screen top-left, 280w)
+// Format: { id, label, component, category, x, y, w, h, children?, note? }
+const MOBILE_BP = [
+  // HEADER ZONE
+  { id:'bp-header', label:'Header', component:'App.vue (template)', cat:'header', x:0,y:0,w:280,h:72,
+    children:[
+      { id:'bp-logo', label:'Newzly •', component:'<h1>',cat:'header', x:6,y:6,w:80,h:22 },
+      { id:'bp-beta', label:'BETA', component:'<span.beta-badge>',cat:'badge', x:89,y:9,w:28,h:14 },
+      { id:'bp-lang', label:'EN|AR', component:'<div.lang-toggle>',cat:'nav', x:152,y:6,w:36,h:22 },
+      { id:'bp-theme', label:'🌙', component:'<button.theme-toggle>',cat:'btn', x:192,y:6,w:22,h:22 },
+      { id:'bp-userprofile', label:'👤', component:'<UserProfile/>',cat:'user', x:218,y:6,w:22,h:22 },
+      { id:'bp-liveindicator', label:'📡', component:'<LiveIndicator/>',cat:'live', x:244,y:6,w:28,h:22 },
+      { id:'bp-locchip', label:'📍 Egypt ▾', component:'<button.loc-chip-sm>',cat:'input', x:6,y:34,w:74,h:24 },
+      { id:'bp-searchinput', label:'🔍 Search news...', component:'<input.header-search-input>',cat:'input', x:84,y:34,w:190,h:24 },
+    ]
+  },
+  // MAP BACKGROUND
+  { id:'bp-newsmap', label:'NewsMap', component:'<NewsMap/> (async)', cat:'map', x:0,y:72,w:280,h:210,
+    children:[
+      { id:'bp-maptiles', label:'map tiles', component:'Leaflet / Mapbox', cat:'map', x:4,y:78,w:272,h:140 },
+      { id:'bp-mappopup', label:'📍 Cairo · [Get News] [AI]', component:'<div.map-action-popup>',cat:'card', x:20,y:210,w:170,h:48 },
+    ]
+  },
+  // ARTICLE DRAWER
+  { id:'bp-drawer', label:'Article Drawer', component:'<main.article-drawer>', cat:'drawer', x:0,y:258,w:280,h:322,
+    children:[
+      { id:'bp-handle', label:'', component:'drag handle',cat:'drawer', x:100,y:262,w:80,h:5 },
+      // Filter row
+      { id:'bp-searchbar', label:'🔍 Search...', component:'<SearchBar/>', cat:'input', x:4,y:270,w:148,h:24 },
+      { id:'bp-loccluster', label:'📍 Egypt ×', component:'<LocationClusterCard/>', cat:'badge', x:156,y:270,w:68,h:24 },
+      { id:'bp-filterbtn', label:'≡', component:'<button.filter-tab-btn>', cat:'btn', x:228,y:270,w:48,h:24 },
+      // Tab nav
+      { id:'bp-tabnav', label:'', component:'<nav.sidebar-nav>', cat:'nav', x:0,y:298,w:280,h:36,
+        children:[
+          { id:'bp-tab-news',    label:'📰 News',   component:'tab', cat:'nav', x:0,   y:298,w:56,h:36 },
+          { id:'bp-tab-live',    label:'📡 Live',   component:'tab', cat:'live', x:56,  y:298,w:56,h:36 },
+          { id:'bp-tab-social',  label:'▶ Social', component:'tab', cat:'social',x:112, y:298,w:56,h:36 },
+          { id:'bp-tab-summary', label:'✦ AI',      component:'tab', cat:'btn',  x:168, y:298,w:56,h:36 },
+          { id:'bp-tab-about',   label:'ℹ About',  component:'tab', cat:'drawer',x:224, y:298,w:56,h:36 },
+        ]
+      },
+      // Cards
+      { id:'bp-newscard-1', label:'', component:'<NewsCard/>', cat:'card', x:4,  y:338,w:132,h:78 },
+      { id:'bp-newscard-2', label:'', component:'<NewsCard/>', cat:'card', x:144,y:338,w:132,h:78 },
+      { id:'bp-newscard',   label:'', component:'<NewsCard/>', cat:'card', x:4,  y:420,w:132,h:78 },
+      { id:'bp-newscard-4', label:'', component:'<NewsCard/>', cat:'card', x:144,y:420,w:132,h:78 },
+      // Pagination
+      { id:'bp-pagination', label:'← 1 2 3 →', component:'<Pagination/>', cat:'nav', x:60,y:504,w:160,h:24 },
+      // AdUnit
+      { id:'bp-adunit', label:'AdUnit', component:'<AdUnit/>', cat:'ad', x:0,y:532,w:280,h:20 },
+      // Footer
+      { id:'bp-footer', label:'AppFooter', component:'<AppFooter/>', cat:'drawer', x:0,y:556,w:280,h:22 },
+    ]
+  },
+]
+
+const DESKTOP_BP = [
+  // Sidebar
+  { id:'bp-sidebar', label:'Desktop Sidebar', component:'<aside.desktop-sidebar>', cat:'nav', x:0,y:0,w:70,h:580,
+    children:[
+      { id:'bp-snav-news',    label:'📰\nNews',      component:'<button.sidebar-item>',cat:'nav',   x:0, y:10,w:70,h:50 },
+      { id:'bp-snav-live',    label:'📡\nLive',      component:'<button.sidebar-item>',cat:'live',  x:0, y:62,w:70,h:50 },
+      { id:'bp-snav-social',  label:'▶\nSocial',     component:'<button.sidebar-item>',cat:'social',x:0, y:114,w:70,h:50 },
+      { id:'bp-snav-summary', label:'✦\nAI',         component:'<button.sidebar-item>',cat:'btn',   x:0, y:166,w:70,h:50 },
+      { id:'bp-snav-about',   label:'ℹ\nAbout',      component:'<button.sidebar-item>',cat:'drawer',x:0, y:218,w:70,h:50 },
+      { id:'bp-trending',     label:'🔥 Trending', component:'<div.sidebar-trending>',cat:'badge',  x:4, y:290,w:62,h:260 },
+    ]
+  },
+  // Main area
+  { id:'bp-desktop-header', label:'Header', component:'App.vue header', cat:'header', x:70,y:0,w:610,h:60,
+    children:[
+      { id:'bp-d-logo', label:'Newzly •', component:'<h1>',cat:'header', x:76,y:8,w:80,h:24 },
+      { id:'bp-d-lang', label:'EN|AR',    component:'lang toggle',cat:'nav',  x:430,y:8,w:40,h:24 },
+      { id:'bp-d-theme', label:'🌙',     component:'theme btn',  cat:'btn',   x:474,y:8,w:26,h:24 },
+      { id:'bp-d-user',  label:'👤',     component:'<UserProfile/>', cat:'user', x:504,y:8,w:26,h:24 },
+      { id:'bp-d-live',  label:'📡',     component:'<LiveIndicator/>', cat:'live', x:534,y:8,w:30,h:24 },
+      { id:'bp-d-search',label:'🔍 Search news...', component:'search input',cat:'input', x:568,y:8,w:100,h:24 },
+    ]
+  },
+  { id:'bp-desktop-map', label:'NewsMap', component:'<NewsMap/> (background)', cat:'map', x:70,y:60,w:610,h:300 },
+  { id:'bp-desktop-filter', label:'Filter', component:'filter panel', cat:'input', x:70,y:62,w:610,h:36 },
+  { id:'bp-desktop-cards', label:'News Cards', component:'<NewsCard/> grid', cat:'card', x:70,y:98,w:610,h:430,
+    children:[
+      { id:'bp-d-c1', label:'', component:'<NewsCard/>',cat:'card', x:76,y:108,w:188,h:120 },
+      { id:'bp-d-c2', label:'', component:'<NewsCard/>',cat:'card', x:272,y:108,w:188,h:120 },
+      { id:'bp-d-c3', label:'', component:'<NewsCard/>',cat:'card', x:468,y:108,w:188,h:120 },
+      { id:'bp-d-c4', label:'', component:'<NewsCard/>',cat:'card', x:76,y:234,w:188,h:120 },
+      { id:'bp-d-c5', label:'', component:'<NewsCard/>',cat:'card', x:272,y:234,w:188,h:120 },
+      { id:'bp-d-c6', label:'', component:'<NewsCard/>',cat:'card', x:468,y:234,w:188,h:120 },
+    ]
+  },
+]
+
+let currentDevice='mobile'
+
+function setDevice(dev){
+  currentDevice=dev
+  document.getElementById('btn-mobile').classList.toggle('active',dev==='mobile')
+  document.getElementById('btn-desktop').classList.toggle('active',dev==='desktop')
+  renderBlueprint()
+}
+
+function renderBlueprint(){
+  const isMobile=currentDevice==='mobile'
+  const data=isMobile?MOBILE_BP:DESKTOP_BP
+  const bpSvg=document.getElementById('bp-svg')
+  bpSvg.innerHTML=''
+
+  // Determine total bounds
+  let maxX=0,maxY=0
+  function walkBounds(items){ items.forEach(el=>{ maxX=Math.max(maxX,el.x+el.w); maxY=Math.max(maxY,el.y+el.h); if(el.children)walkBounds(el.children) }) }
+  walkBounds(data)
+
+  // For mobile: phone frame wrapper
+  // For desktop: flat browser frame
+  const PAD=16
+  const NS2='http://www.w3.org/2000/svg'
+
+  if(isMobile){
+    // Phone frame
+    const PFW=320,PFH=680,SX=20,SY=48,SW=280,SH=594
+    const totalW=PFW+PAD*2,totalH=PFH+PAD*2
+    bpSvg.setAttribute('width',Math.min(totalW,370))
+    bpSvg.setAttribute('height',totalH)
+    bpSvg.setAttribute('viewBox',`${-PAD} ${-PAD} ${totalW} ${totalH}`)
+
+    // Device shell
+    const shell=document.createElementNS(NS2,'rect')
+    shell.setAttribute('x',0); shell.setAttribute('y',0)
+    shell.setAttribute('width',PFW); shell.setAttribute('height',PFH)
+    shell.setAttribute('rx',36); shell.setAttribute('fill','#1a1a1f')
+    shell.setAttribute('stroke','#3e3e46'); shell.setAttribute('stroke-width','2')
+    bpSvg.appendChild(shell)
+
+    // Screen bg
+    const screen=document.createElementNS(NS2,'rect')
+    screen.setAttribute('x',SX); screen.setAttribute('y',SY)
+    screen.setAttribute('width',SW); screen.setAttribute('height',SH)
+    screen.setAttribute('rx',4); screen.setAttribute('fill','#0d0d10')
+    bpSvg.appendChild(screen)
+
+    // Dynamic island
+    const island=document.createElementNS(NS2,'rect')
+    island.setAttribute('x',105); island.setAttribute('y',16)
+    island.setAttribute('width',110); island.setAttribute('height',24)
+    island.setAttribute('rx',12); island.setAttribute('fill','#0a0a0d')
+    island.setAttribute('stroke','#2a2a30'); island.setAttribute('stroke-width','1')
+    bpSvg.appendChild(island)
+
+    // Home indicator
+    const home=document.createElementNS(NS2,'rect')
+    home.setAttribute('x',120); home.setAttribute('y',PFH-14)
+    home.setAttribute('width',80); home.setAttribute('height',4)
+    home.setAttribute('rx',2); home.setAttribute('fill','#2e2e38')
+    bpSvg.appendChild(home)
+
+    // Draw elements offset by screen position
+    const g=document.createElementNS(NS2,'g')
+    g.setAttribute('transform',`translate(${SX},${SY})`)
+    g.setAttribute('clip-path','none') // elements inside screen bounds
+    bpSvg.appendChild(g)
+    data.forEach(el=>drawBPEl(el,g,NS2))
+
+  } else {
+    // Desktop browser frame
+    const BFW=700,BH=620,TBH=32
+    const totalW=BFW+PAD*2,totalH=BH+TBH+PAD*2
+    bpSvg.setAttribute('width',Math.min(totalW,370))
+    bpSvg.setAttribute('height',totalH)
+    bpSvg.setAttribute('viewBox',`${-PAD} ${-PAD} ${totalW} ${totalH}`)
+
+    // Browser chrome
+    const chrome=document.createElementNS(NS2,'rect')
+    chrome.setAttribute('x',0); chrome.setAttribute('y',0)
+    chrome.setAttribute('width',BFW); chrome.setAttribute('height',TBH)
+    chrome.setAttribute('fill','#1c1c1f'); chrome.setAttribute('stroke','#2e2e36'); chrome.setAttribute('stroke-width',1)
+    bpSvg.appendChild(chrome)
+    // Traffic lights
+    ;[[6,'#ff5f57'],[20,'#febc2e'],[34,'#28c840']].forEach(([x,c])=>{
+      const d=document.createElementNS(NS2,'circle')
+      d.setAttribute('cx',x+4); d.setAttribute('cy',16)
+      d.setAttribute('r',5); d.setAttribute('fill',c); d.setAttribute('opacity',.7)
+      bpSvg.appendChild(d)
+    })
+    // URL bar
+    const url=document.createElementNS(NS2,'rect')
+    url.setAttribute('x',60); url.setAttribute('y',8)
+    url.setAttribute('width',580); url.setAttribute('height',16)
+    url.setAttribute('rx',8); url.setAttribute('fill','rgba(255,255,255,.06)'); url.setAttribute('stroke','#333')
+    bpSvg.appendChild(url)
+    const urlT=document.createElementNS(NS2,'text')
+    urlT.setAttribute('x',350); urlT.setAttribute('y',16)
+    urlT.setAttribute('fill','#555'); urlT.setAttribute('font-size','9')
+    urlT.setAttribute('text-anchor','middle'); urlT.setAttribute('dominant-baseline','middle')
+    urlT.setAttribute('font-family','monospace')
+    urlT.textContent='🔒 newzly.app'; bpSvg.appendChild(urlT)
+    // Content area
+    const content=document.createElementNS(NS2,'rect')
+    content.setAttribute('x',0); content.setAttribute('y',TBH)
+    content.setAttribute('width',BFW); content.setAttribute('height',BH)
+    content.setAttribute('fill','#0d0d10')
+    bpSvg.appendChild(content)
+    const g=document.createElementNS(NS2,'g')
+    g.setAttribute('transform',`translate(0,${TBH})`)
+    bpSvg.appendChild(g)
+    // scale down desktop to fit
+    const sc=370/700
+    g.setAttribute('transform',`translate(0,${TBH}) scale(${sc})`)
+    data.forEach(el=>drawBPEl(el,g,NS2))
+  }
+
+  buildAnnotations(data)
+}
+
+function drawBPEl(el,parent,NS2){
+  const c=BP_COLORS[el.cat]||BP_COLORS.drawer
+  const g=document.createElementNS(NS2,'g')
+  g.setAttribute('class','bp-comp')
+  g.setAttribute('id',el.id)
+  g.setAttribute('data-component',el.component)
+
+  const rect=document.createElementNS(NS2,'rect')
+  rect.setAttribute('x',el.x); rect.setAttribute('y',el.y)
+  rect.setAttribute('width',el.w); rect.setAttribute('height',el.h)
+  rect.setAttribute('rx',3)
+  rect.setAttribute('fill',c.fill)
+  rect.setAttribute('stroke',c.stroke)
+  rect.setAttribute('stroke-width',el.cat==='header'?0:.8)
+  g.appendChild(rect)
+
+  // Component label inside (if it fits)
+  if(el.label && el.h>=14 && el.w>=24){
+    const lines=el.label.split('\n')
+    lines.forEach((line,li)=>{
+      const t=document.createElementNS(NS2,'text')
+      t.setAttribute('x', el.x+el.w/2)
+      t.setAttribute('y', el.y+el.h/2+(li-(lines.length-1)/2)*12)
+      t.setAttribute('fill',c.label)
+      t.setAttribute('font-size', el.h>40?10:8)
+      t.setAttribute('text-anchor','middle')
+      t.setAttribute('dominant-baseline','middle')
+      t.setAttribute('font-family','monospace')
+      t.setAttribute('pointer-events','none')
+      t.textContent=line
+      g.appendChild(t)
+    })
+  }
+
+  // Small component tag bottom-right (for larger blocks)
+  if(el.h>60 && el.w>100){
+    const tag=document.createElementNS(NS2,'text')
+    tag.setAttribute('x',el.x+el.w-3); tag.setAttribute('y',el.y+el.h-3)
+    tag.setAttribute('fill',c.stroke+'cc'); tag.setAttribute('font-size',7)
+    tag.setAttribute('text-anchor','end'); tag.setAttribute('dominant-baseline','text-bottom')
+    tag.setAttribute('font-family','monospace'); tag.setAttribute('pointer-events','none')
+    tag.textContent='<'+el.id.replace('bp-','')+'>'
+    g.appendChild(tag)
+  }
+
+  parent.appendChild(g)
+
+  // Hover effect
+  g.addEventListener('mouseenter',()=>{
+    rect.setAttribute('stroke-width',1.5)
+    rect.setAttribute('stroke',lighten(c.stroke))
+    // Highlight linked mindmap node
+    const mmId=bpToNode[el.id]
+    if(mmId&&mmNodeEls[mmId]){
+      const ng=mmNodeEls[mmId]
+      ng.style.filter='brightness(1.4)'
+      ng.querySelectorAll('rect:first-child,circle').forEach(r=>r.setAttribute('opacity','1'))
+    }
+    showBPTooltip(el)
+  })
+  g.addEventListener('mouseleave',()=>{
+    rect.setAttribute('stroke-width',el.cat==='header'?0:.8)
+    rect.setAttribute('stroke',c.stroke)
+    const mmId=bpToNode[el.id]
+    if(mmId&&mmNodeEls[mmId])mmNodeEls[mmId].style.filter=''
+    hideBPTooltip()
+  })
+
+  // Draw children on top
+  if(el.children) el.children.forEach(child=>drawBPEl(child,parent,NS2))
+}
+
+function lighten(hex){
+  // Simple: just return a brighter version
+  return hex==='none'?'#fff':hex+'dd'
+}
+
+// Reverse mapping: bp id → mindmap node id
+const bpToNode={}
+Object.entries(nodeToBP).forEach(([nid,bid])=>{ bpToNode[bid]=nid })
+// Also some aliases
+bpToNode['bp-newscard-1']=bpToNode['bp-newscard-2']=bpToNode['bp-newscard-4']='NewsCard.vue'
+
+// Highlight BP element from mindmap hover
+function highlightBP(bpId,on){
+  if(!bpId)return
+  const el=document.getElementById(bpId)
+  if(!el)return
+  if(on){
+    el.querySelectorAll('rect').forEach(r=>r.setAttribute('filter','brightness(2)'))
+    el.style.outline='1px solid #4fc3f7'
+  } else {
+    el.querySelectorAll('rect').forEach(r=>r.removeAttribute('filter'))
+    el.style.outline=''
+  }
+}
+
+// Tooltip
+let tooltipEl=null
+function showBPTooltip(el){
+  if(!tooltipEl){tooltipEl=document.createElement('div');tooltipEl.style.cssText='position:fixed;background:#1e1e24;border:1px solid #3e3e42;border-radius:6px;padding:6px 12px;font-size:10px;color:#9ca3af;z-index:999;pointer-events:none;font-family:monospace;max-width:280px;';document.body.appendChild(tooltipEl)}
+  tooltipEl.innerHTML=`<span style="color:#4fc3f7">${el.component}</span>`
+  tooltipEl.style.display='block'
+  document.addEventListener('mousemove',moveTooltip)
+}
+function moveTooltip(ev){if(tooltipEl)tooltipEl.style.cssText+=`;left:${ev.clientX+14}px;top:${ev.clientY-10}px;display:block;`}
+function hideBPTooltip(){if(tooltipEl)tooltipEl.style.display='none';document.removeEventListener('mousemove',moveTooltip)}
+
+// Annotation list
+const annotItems=[
+  {id:'bp-header',    color:'#334155', name:'Header',          comp:'App.vue (sticky top)'},
+  {id:'bp-newsmap',   color:'#15803d', name:'NewsMap',         comp:'async component · map background'},
+  {id:'bp-userprofile',color:'#6d28d9',name:'UserProfile',     comp:'Google auth + avatar'},
+  {id:'bp-liveindicator',color:'#166534',name:'LiveIndicator', comp:'feed status + last update'},
+  {id:'bp-searchbar', color:'#92400e', name:'SearchBar',       comp:'topic · lang · hours · smart search'},
+  {id:'bp-loccluster',color:'#b45309', name:'LocationCluster', comp:'active country chips'},
+  {id:'bp-drawer',    color:'#27272a', name:'Article Drawer',  comp:'Google Maps-style bottom sheet'},
+  {id:'bp-tabnav',    color:'#3730a3', name:'Tab Nav',         comp:'News · Live · Social · AI · About'},
+  {id:'bp-newscard',  color:'#1e3a5f', name:'NewsCard',        comp:'article card with share / diff badge'},
+  {id:'bp-summary',   color:'#3730a3', name:'NewsSummary',     comp:'AI summary tab content'},
+  {id:'bp-pagination',color:'#3730a3', name:'Pagination',      comp:'page controls'},
+  {id:'bp-adunit',    color:'#3f3f46', name:'AdUnit',          comp:'display ad slot'},
+  {id:'bp-footer',    color:'#27272a', name:'AppFooter',       comp:'links + copyright'},
+]
+
+function buildAnnotations(data){
+  const div=document.getElementById('bp-annotations')
+  div.innerHTML='<div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#333;margin-bottom:8px;padding:0 4px;">Components</div>'
+  annotItems.forEach(item=>{
+    const row=document.createElement('div')
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:4px 4px;border-bottom:1px solid rgba(255,255,255,.03);cursor:default;border-radius:4px;transition:background .1s;'
+    row.innerHTML=`<div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${item.color};opacity:.7;"></div>
+      <span style="font-size:10px;color:#6b7280;flex:1;">${item.name}</span>
+      <span style="font-size:9px;color:#374151;font-style:italic;text-align:right;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.comp}</span>`
+    row.addEventListener('mouseenter',()=>{ row.style.background='rgba(255,255,255,.03)'; highlightBP(item.id,true) })
+    row.addEventListener('mouseleave',()=>{ row.style.background=''; highlightBP(item.id,false) })
+    div.appendChild(row)
+  })
+}
+
+// ── Blueprint resize handle ───────────────────────────────────────────────────
+const resizeH=document.getElementById('resize-h')
+let resizing=false,resizeStart=0,bpStartW=400
+resizeH.addEventListener('mousedown',ev=>{ resizing=true; resizeStart=ev.clientX; bpStartW=document.getElementById('bp-pane').offsetWidth; ev.preventDefault() })
+window.addEventListener('mousemove',ev=>{
+  if(!resizing)return
+  const delta=resizeStart-ev.clientX
+  const newW=Math.max(300,Math.min(600,bpStartW+delta))
+  document.getElementById('bp-pane').style.width=newW+'px'
+})
+window.addEventListener('mouseup',()=>resizing=false)
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+const toastEl=document.getElementById('toast'); let toastTimer
+function showToast(msg){ toastEl.textContent=msg; toastEl.style.opacity=1; clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastEl.style.opacity=0,2200) }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  drawGrid()
+  centerVP()
+  mmEdges.forEach(e=>renderMMEdge(e))
+  mmNodes.forEach(n=>renderMMNode(n))
+  requestAnimationFrame(simTick)
+  renderBlueprint()
+})
+window.addEventListener('resize',()=>{ document.getElementById('static-grid').innerHTML=''; drawGrid(); centerVP() })
+</script>
+</body>
+</html>

@@ -17,6 +17,8 @@ export interface ClaudeEvent {
   data?: unknown
   timestamp: number
   session_id?: string
+  input_tokens?: number
+  output_tokens?: number
 }
 
 // Tool input shapes

@@ -7,6 +7,7 @@ import type {
   AgentSphere,
   ToolInputWithPath,
 } from '../types/events'
+import type { UsageRecord } from '../types/usage'
 import {
   ROOT_ID,
   ROOT_BOUNDS,
@@ -214,6 +215,11 @@ interface AppStore {
   // ── Chat context injection ──
   chatContext: string | null
   setChatContext: (ctx: string | null) => void
+  // ── Usage tracking ──
+  sessionUsageRecords: UsageRecord[]
+  addSessionUsageRecord: (record: UsageRecord) => void
+  usagePanelOpen: boolean
+  toggleUsagePanel: () => void
 }
 
 const SCENE_INITIAL = {
@@ -238,6 +244,8 @@ export const useStore = create<AppStore>((set) => ({
   emotion: 'neutral',
   chatContext: null,
   searchQuery: '',
+  sessionUsageRecords: [],
+  usagePanelOpen: false,
   ...SCENE_INITIAL,
 
   addEvent: (event) =>
@@ -335,6 +343,11 @@ export const useStore = create<AppStore>((set) => ({
 
   setChatContext: (ctx) => set({ chatContext: ctx }),
 
+  addSessionUsageRecord: (record) =>
+    set((state) => ({ sessionUsageRecords: [...state.sessionUsageRecords, record] })),
+
+  toggleUsagePanel: () => set((state) => ({ usagePanelOpen: !state.usagePanelOpen })),
+
   loadPaths: (paths) =>
     set((state) => {
       let nodes = state.quadNodes
@@ -357,6 +370,7 @@ export const useStore = create<AppStore>((set) => ({
       isProcessing: false,
       avatarState: 'idle',
       emotion: 'neutral',
+      sessionUsageRecords: [],
       ...SCENE_INITIAL,
     }),
 }))

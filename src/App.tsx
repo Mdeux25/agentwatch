@@ -11,8 +11,12 @@ import { WelcomeModal } from './components/WelcomeModal'
 import { RenderErrorBoundary } from './components/scene/RenderErrorBoundary'
 import { buildEditDiff, DiffLines } from './lib/diffUtils'
 import { deriveFileHistory, deriveTaskHistory } from './lib/editHistory'
+import { UsagePanel } from './components/UsagePanel'
+import { appendUsageRecord } from './lib/usageStorage'
+import { calcCost } from './lib/usageCalc'
 import type { ClaudeEvent } from './types/events'
 import type { EditEntry, TaskEntry } from './lib/editHistory'
+import type { UsageRecord } from './types/usage'
 
 // ── Recent project paths (localStorage) ──────────────────────────────────────
 const RECENT_KEY = 'claudeAvatar.recentPaths'
@@ -201,6 +205,7 @@ export default function App() {
   const {
     events, sessionId, isProcessing, avatarState,
     addEvent, setProcessing, setSessionId, clearSession,
+    addSessionUsageRecord, toggleUsagePanel, usagePanelOpen,
     sceneMode, toggleSceneMode,
     activeFileId, quadNodes, projectRoot,
     setActiveFileContent, setActiveFileId,
@@ -277,6 +282,27 @@ export default function App() {
       addEvent(event)
       if (event.type === 'assistant_message' || event.type === 'error') {
         setTimeout(() => setProcessing(false), 400)
+      }
+      // Track usage when result arrives with token data
+      if (event.type === 'assistant_message' && event.input_tokens) {
+        const state = useStore.getState()
+        const lastUserMsg = [...state.events].reverse().find(e => e.type === 'user_message')
+        const record: UsageRecord = {
+          id: `${event.timestamp}-${state.sessionId ?? 'unknown'}`,
+          timestamp: event.timestamp,
+          date: new Date(event.timestamp).toLocaleDateString('en-CA'),
+          projectRoot: state.projectRoot ?? '',
+          projectName: (state.projectRoot ?? '').split('/').at(-1) ?? 'unknown',
+          sessionId: state.sessionId ?? 'unknown',
+          taskIndex: state.events.filter(e => e.type === 'user_message').length - 1,
+          taskPrompt: (lastUserMsg?.message ?? '').slice(0, 100),
+          inputTokens: event.input_tokens,
+          outputTokens: event.output_tokens ?? 0,
+          costUsd: calcCost(event.input_tokens, event.output_tokens ?? 0),
+          model: 'claude-sonnet-4-6',
+        }
+        appendUsageRecord(record).catch(console.error)
+        addSessionUsageRecord(record)
       }
     }).then(fn => { if (cancelled) fn(); else unlisten = fn })
     return () => { cancelled = true; unlisten?.() }
@@ -489,6 +515,17 @@ export default function App() {
             </svg>
           </button>
 
+          <button
+            className={`ide-activity-btn ${usagePanelOpen ? 'active' : ''}`}
+            onClick={toggleUsagePanel}
+            title="Usage & cost"
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M8 5v1.5M8 9.5V11M6.5 6.5h2a1 1 0 010 2h-1a1 1 0 000 2h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </button>
+
           <div style={{ flex: 1 }} />
 
           <button
@@ -631,10 +668,11 @@ export default function App() {
               </div>
 
               {/* Editor */}
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
                 <RenderErrorBoundary label="editor">
                   <CodeEditorPanel />
                 </RenderErrorBoundary>
+                <UsagePanel />
               </div>
 
               {/* Bottom panel (diff / history) */}

@@ -37,6 +37,8 @@ fn emit_error(app: &AppHandle, msg: String) {
             data: None,
             timestamp: now_ms(),
             session_id: None,
+            input_tokens: None,
+            output_tokens: None,
         },
     );
 }

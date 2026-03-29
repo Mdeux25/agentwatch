@@ -88,7 +88,41 @@ fn read_file_full(path: String) -> Result<String, String> {
 
 #[tauri::command]
 fn write_file(path: String, content: String) -> Result<(), String> {
+    let p = std::path::Path::new(&path);
+    if let Some(parent) = p.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
     std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+// ── Usage tracking ─────────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn append_usage_record(record: String) -> Result<(), String> {
+    use std::io::Write;
+    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+    let path = std::path::Path::new(&home).join(".agentwatch").join("usage.jsonl");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|e| e.to_string())?;
+    writeln!(file, "{}", record).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_usage_records() -> Result<String, String> {
+    let home = std::env::var("HOME").map_err(|e| e.to_string())?;
+    let path = std::path::Path::new(&home).join(".agentwatch").join("usage.jsonl");
+    // Return empty string if file doesn't exist yet
+    match std::fs::read_to_string(&path) {
+        Ok(content) => Ok(content),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 // ── App entry point ───────────────────────────────────────────────────────────
@@ -107,6 +141,8 @@ pub fn run() {
             get_home_dir,
             read_file_full,
             write_file,
+            append_usage_record,
+            load_usage_records,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
