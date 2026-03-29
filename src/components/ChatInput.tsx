@@ -159,7 +159,7 @@ export function ChatInput({ onSubmit, onCommand, isDisabled, contextFileName, on
           disabled={isDisabled}
           placeholder={isDisabled ? 'Processing...' : 'Ask Claude… or type / for commands'}
           rows={1}
-          className="flex-1 bg-transparent text-gray-200 placeholder-gray-600 text-sm font-mono resize-none px-4 py-3 focus:outline-none max-h-40 overflow-y-auto"
+          className="flex-1 bg-transparent text-gray-200 placeholder-gray-600 text-sm resize-none px-4 py-3 focus:outline-none max-h-40 overflow-y-auto"
         />
         <motion.button
           onClick={handleSubmit}

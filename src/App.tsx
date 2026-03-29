@@ -2,14 +2,14 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EventLog } from './components/EventLog'
 import { ChatInput } from './components/ChatInput'
-import { SceneCanvas } from './components/scene/SceneCanvas'
+import { FileExplorer2D } from './components/scene/FileExplorer2D'
+import { RenderErrorBoundary } from './components/scene/RenderErrorBoundary'
 import { useStore } from './store/useStore'
 import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull, saveContextFiles, generateFileSummary } from './lib/tauri'
 import { generateContextMd, wrapSummaryHtml } from './lib/metaFileGen'
 import { CodeEditorPanel } from './components/CodeEditorPanel'
 import { AvatarDot } from './components/AvatarDot'
 import { WelcomeModal } from './components/WelcomeModal'
-import { RenderErrorBoundary } from './components/scene/RenderErrorBoundary'
 import { buildEditDiff, DiffLines } from './lib/diffUtils'
 import { deriveFileHistory, deriveTaskHistory } from './lib/editHistory'
 import { UsagePanel } from './components/UsagePanel'
@@ -246,6 +246,9 @@ export default function App() {
   const [sceneH, setSceneH] = useState(300)    // top scene panel height px
   const [chatW, setChatW] = useState(320)       // right chat panel width px
   const [bottomH, setBottomH] = useState(220)  // bottom diff/history height px
+  const [explorerZoom, setExplorerZoom] = useState(100)
+  const MIN_ZOOM = 50
+  const MAX_ZOOM = 200
 
   // Drag resize refs
   const draggingRef = useRef<null | { type: 'scene' | 'chat' | 'bottom'; start: number; startVal: number }>(null)
@@ -640,45 +643,23 @@ export default function App() {
                 <div className="ide-panel-header" style={{ background: '#2a2a2b' }}>
                   <span className="ide-panel-title">Explorer</span>
                   <div className="ide-panel-actions">
-                    <button className="ide-icon-btn" onClick={toggleSceneMode} title={`Switch to ${sceneMode === 'treemap' ? 'tree' : 'map'}`}>
-                      {sceneMode === 'treemap' ? '⊞' : '⊟'}
-                    </button>
-                    {(['showFolders', 'showMisc', 'showSubmodules'] as const).map(key => (
-                      <button
-                        key={key}
-                        className={`ide-icon-btn ${vizOptions[key] ? 'active' : 'dim'}`}
-                        onClick={() => setVizOption(key, !vizOptions[key])}
-                        title={VIZ_LABELS[key]}
-                        style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', fontWeight: 700, width: 28 }}
-                      >
-                        {VIZ_LABELS[key].slice(0, 3)}
-                      </button>
-                    ))}
-                    <button
-                      className={`ide-icon-btn ${useGitignore ? 'active' : 'dim'}`}
-                      onClick={() => setUseGitignore(!useGitignore)}
-                      title={useGitignore ? '.gitignore respected (click to show all)' : '.gitignore ignored (click to hide gitignored files)'}
-                      style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', fontWeight: 700, width: 28 }}
-                    >
-                      .gi
-                    </button>
-                    {/* Label scale A-/A+ */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4 }}>
+                    {/* Zoom controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <button
                         className="ide-icon-btn"
-                        onClick={() => setLabelScale(labelScale - 0.25)}
-                        title="Smaller labels"
-                        style={{ fontSize: 10, fontWeight: 700, width: 22, fontFamily: 'var(--ide-font-ui)' }}
-                      >A-</button>
-                      <span style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', color: 'var(--ide-fg-muted)', minWidth: 22, textAlign: 'center' }}>
-                        {labelScale.toFixed(1)}×
+                        onClick={() => setExplorerZoom(z => Math.max(MIN_ZOOM, z - 10))}
+                        title="Zoom out"
+                        style={{ fontSize: 14, width: 22, fontWeight: 700 }}
+                      >−</button>
+                      <span style={{ fontSize: 10, fontFamily: 'var(--ide-font-mono)', color: 'var(--ide-fg-muted)', minWidth: 32, textAlign: 'center' }}>
+                        {explorerZoom}%
                       </span>
                       <button
                         className="ide-icon-btn"
-                        onClick={() => setLabelScale(labelScale + 0.25)}
-                        title="Larger labels"
-                        style={{ fontSize: 10, fontWeight: 700, width: 22, fontFamily: 'var(--ide-font-ui)' }}
-                      >A+</button>
+                        onClick={() => setExplorerZoom(z => Math.min(MAX_ZOOM, z + 10))}
+                        title="Zoom in"
+                        style={{ fontSize: 14, width: 22, fontWeight: 700 }}
+                      >+</button>
                     </div>
 
                     {/* Inline search */}
@@ -699,11 +680,9 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Scene canvas */}
-                <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                  <RenderErrorBoundary label="canvas">
-                    <SceneCanvas />
-                  </RenderErrorBoundary>
+                {/* File explorer */}
+                <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                  <FileExplorer2D zoom={explorerZoom} />
                 </div>
               </>
             )}

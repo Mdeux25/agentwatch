@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import type { ClaudeEvent } from '../types/events'
 import { EventItem } from './EventItem'
 
@@ -16,18 +16,22 @@ export function EventLog({ events }: EventLogProps) {
 
   if (events.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-8">
-        <p className="text-gray-600 text-sm font-mono">Waiting for your prompt...</p>
-        <p className="text-gray-700 text-xs font-mono">
-          Claude Code CLI will be spawned for each request
-        </p>
-      </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1 }}
+        className="flex-1 flex flex-col items-center justify-center gap-2.5 text-center p-8 select-none"
+      >
+        <span className="text-gray-700 text-2xl leading-none">◈</span>
+        <p className="text-gray-500 text-sm">Ask Claude anything</p>
+        <p className="text-gray-700 text-[11px] font-mono">Type / for commands</p>
+      </motion.div>
     )
   }
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb scrollbar-track-transparent">
-      <div className="space-y-0.5 p-4">
+      <div className="py-2 px-2">
         <AnimatePresence initial={false}>
           {events.map((event, i) => (
             <EventItem key={`${event.timestamp}-${i}`} event={event} />
