@@ -251,6 +251,9 @@ export default function App() {
   const MAX_ZOOM = 200
   const [explorerNavStack, setExplorerNavStack] = useState<Array<{ id: string; name: string }>>([])
   const explorerId = explorerNavStack.length > 0 ? explorerNavStack[explorerNavStack.length - 1].name : null
+  const [cardFontSize, setCardFontSize] = useState(11)
+  const MIN_FONT = 8
+  const MAX_FONT = 18
 
   // Drag resize refs
   const draggingRef = useRef<null | { type: 'scene' | 'chat' | 'bottom'; start: number; startVal: number }>(null)
@@ -675,6 +678,25 @@ export default function App() {
                       >+</button>
                     </div>
 
+                    {/* Font size A−/A+ */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4 }}>
+                      <button
+                        className="ide-icon-btn"
+                        onClick={() => setCardFontSize(f => Math.max(MIN_FONT, f - 1))}
+                        title="Smaller text"
+                        style={{ fontSize: 10, fontWeight: 700, width: 22, fontFamily: 'var(--ide-font-ui)' }}
+                      >A−</button>
+                      <span style={{ fontSize: 9, fontFamily: 'var(--ide-font-mono)', color: 'var(--ide-fg-muted)', minWidth: 18, textAlign: 'center' }}>
+                        {cardFontSize}
+                      </span>
+                      <button
+                        className="ide-icon-btn"
+                        onClick={() => setCardFontSize(f => Math.min(MAX_FONT, f + 1))}
+                        title="Larger text"
+                        style={{ fontSize: 10, fontWeight: 700, width: 22, fontFamily: 'var(--ide-font-ui)' }}
+                      >A+</button>
+                    </div>
+
                     {/* Filter toggles */}
                     {(['showFolders', 'showMisc', 'showSubmodules'] as const).map(key => (
                       <button
@@ -716,6 +738,7 @@ export default function App() {
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                   <FileExplorer2D
                     zoom={explorerZoom}
+                    fontSize={cardFontSize}
                     navStack={explorerNavStack}
                     onDrillDown={(id, name) => setExplorerNavStack(s => [...s, { id, name }])}
                   />

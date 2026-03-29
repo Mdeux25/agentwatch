@@ -8,6 +8,14 @@ const EXT_COLOR: Record<string, string> = {
   rs: '#fb923c', rb: '#cc342d', vue: '#4ade80', dart: '#22d3ee',
 }
 
+// Richer dark tint backgrounds per extension
+const EXT_BG: Record<string, string> = {
+  ts: '#08172e', tsx: '#0e0b2a', js: '#1a1600', jsx: '#1a0e00',
+  css: '#041520', scss: '#100520', html: '#1a0800', md: '#0a1018',
+  json: '#141400', swift: '#180d00', py: '#141400', go: '#041520',
+  rs: '#180800', rb: '#180000', vue: '#041510', dart: '#041818',
+}
+
 // ─── Squarified treemap algorithm ──────────────────────────────────────────
 
 type R = { x: number; y: number; w: number; h: number }
@@ -140,11 +148,12 @@ interface NavEntry { id: string; name: string }
 
 interface Props {
   zoom: number
+  fontSize: number
   navStack: NavEntry[]
   onDrillDown: (id: string, name: string) => void
 }
 
-export function FileExplorer2D({ zoom, navStack, onDrillDown }: Props) {
+export function FileExplorer2D({ zoom, fontSize, navStack, onDrillDown }: Props) {
   const quadNodes       = useStore(s => s.quadNodes)
   const searchQuery     = useStore(s => s.searchQuery)
   const activeFileId    = useStore(s => s.activeFileId)
@@ -278,38 +287,43 @@ export function FileExplorer2D({ zoom, navStack, onDrillDown }: Props) {
           if (tile.kind === 'file' && !vizOptions.showMisc && !EXT_COLOR[tile.ext]) return null
 
           if (tile.kind === 'directory') {
-            const showLabel = w > 22 && h > 12
-            const fs = Math.min(11, Math.max(8, Math.min(w * 0.1, 11)))
+            const showLabel = w > 28 && h > 14
+            const fs = Math.min(fontSize, Math.max(8, Math.min(w * 0.1, fontSize)))
             const labelH = showLabel ? Math.min(HDR, h) : 0
             return (
               <div key={tile.id} style={{
                 position: 'absolute', left: x, top: y, width: w, height: h,
-                border: '1px solid rgba(255,153,0,0.3)',
-                borderRadius: 3,
-                background: 'rgba(255,153,0,0.05)',
+                border: '1px solid rgba(255,153,0,0.22)',
+                borderRadius: 4,
+                background: 'rgba(255,140,0,0.035)',
+                boxShadow: 'inset 0 1px 0 rgba(255,180,0,0.07)',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
-                pointerEvents: 'none',   // outer box: passthrough for drag
+                pointerEvents: 'none',
               }}>
                 {showLabel && (
-                  // Label strip is the clickable drill-down target
                   <div
                     onClick={(e) => { e.stopPropagation(); if (!hasMoved.current) onDrillDown(tile.id, tile.name) }}
                     style={{
                       position: 'absolute', top: 0, left: 0, right: 0, height: labelH,
-                      display: 'flex', alignItems: 'center', paddingLeft: 4,
-                      cursor: 'pointer',
-                      pointerEvents: 'all',
-                      borderRadius: '3px 3px 0 0',
+                      display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 5,
+                      cursor: 'pointer', pointerEvents: 'all',
+                      borderBottom: '1px solid rgba(255,153,0,0.12)',
+                      borderRadius: '4px 4px 0 0',
+                      transition: 'background 0.12s',
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,153,0,0.15)')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,153,0,0.12)')}
                     onMouseLeave={e => (e.currentTarget.style.background = '')}
                   >
+                    <span style={{ fontSize: fs - 1, color: 'rgba(255,153,0,0.5)', lineHeight: 1, flexShrink: 0 }}>▸</span>
                     <span style={{
-                      fontSize: fs, color: 'rgba(255,224,160,0.9)',
-                      fontFamily: 'JetBrains Mono, monospace',
-                      whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: w - 8,
-                      lineHeight: 1.3,
+                      fontSize: fs,
+                      fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                      fontWeight: 600,
+                      letterSpacing: '0.25px',
+                      color: 'rgba(255,220,140,0.9)',
+                      whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: w - 20,
+                      lineHeight: 1,
                     }}>
                       {tile.name}
                     </span>
@@ -324,15 +338,17 @@ export function FileExplorer2D({ zoom, navStack, onDrillDown }: Props) {
           const isSelected    = tile.id === activeFileId
           const isMatch       = !searchQuery || tile.name.toLowerCase().includes(searchQuery.toLowerCase())
           const accent        = EXT_COLOR[tile.ext] ?? '#64748b'
-          const showName      = w > 26 && h > 11
-          const fs            = Math.min(11, Math.max(7, Math.min(h * 0.55, w * 0.1)))
+          const cardBg        = EXT_BG[tile.ext] ?? '#0c0c14'
+          const touched       = isAgentActive || tile.accessCount > 0
 
-          const bg = isAgentActive
-            ? `${accent}22`
-            : isSelected ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'
-          const borderColor = isAgentActive
-            ? accent
-            : isSelected ? `${accent}80` : 'rgba(255,255,255,0.07)'
+          // Font: user-controlled base, clamped so it never overflows tiny cards
+          const fs = Math.min(fontSize, Math.max(fontSize * 0.7, Math.min(h * 0.45, w * 0.18, fontSize)))
+
+          const tileBg = isAgentActive ? `${accent}28` : isSelected ? `${accent}16` : cardBg
+          const borderCol = isAgentActive ? accent : isSelected ? `${accent}70` : 'rgba(255,255,255,0.08)'
+          const shadow = isAgentActive
+            ? `0 0 0 1px ${accent}50, inset 0 1px 0 rgba(255,255,255,0.08)`
+            : 'inset 0 1px 0 rgba(255,255,255,0.04)'
 
           return (
             <div
@@ -340,41 +356,54 @@ export function FileExplorer2D({ zoom, navStack, onDrillDown }: Props) {
               onClick={() => { if (!hasMoved.current) setActiveFileId(tile.id) }}
               style={{
                 position: 'absolute', left: x, top: y, width: w, height: h,
-                background: bg,
-                border: `1px solid ${borderColor}`,
-                borderRadius: 3,
+                background: tileBg,
+                border: `1px solid ${borderCol}`,
+                borderRadius: 4,
+                boxShadow: shadow,
                 boxSizing: 'border-box',
                 cursor: 'pointer',
                 opacity: searchQuery && !isMatch ? 0.1 : 1,
-                overflow: 'visible',
+                overflow: 'hidden',
                 display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '0 5px',
-                // CSS color drives the ping rings' currentColor
+                alignItems: 'flex-start',
+                gap: 5,
+                padding: '4px 5px',
                 color: accent,
+                transition: 'background 0.1s, border-color 0.1s',
               }}
             >
-              {/* Agent ping rings (reuse existing CSS classes from index.css) */}
+              {/* Agent ping rings */}
               {isAgentActive && (
-                <div style={{ position: 'absolute', inset: -3, borderRadius: 5, pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', inset: -3, borderRadius: 6, pointerEvents: 'none' }}>
                   <div className="agent-ping-outer" />
                   <div className="agent-ping-inner" />
                 </div>
               )}
 
-              {/* Left accent bar — bright when Claude touched it */}
+              {/* Left accent bar — full height via alignSelf stretch */}
               <div style={{
-                width: 2, height: '60%', borderRadius: 1, flexShrink: 0,
-                background: isAgentActive || tile.accessCount > 0 ? accent : 'rgba(255,255,255,0.12)',
+                width: 2.5,
+                alignSelf: 'stretch',
+                borderRadius: 2,
+                flexShrink: 0,
+                background: touched ? accent : 'rgba(255,255,255,0.1)',
+                boxShadow: touched ? `0 0 6px ${accent}90` : 'none',
+                transition: 'background 0.2s, box-shadow 0.2s',
               }} />
 
-              {showName && (
+              {/* Filename — wraps naturally, clipped by card overflow:hidden */}
+              {w > 20 && h > 14 && (
                 <span style={{
-                  fontSize: fs, fontFamily: 'JetBrains Mono, monospace',
-                  color: isAgentActive ? '#fff' : '#ccc',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap', flex: 1,
+                  fontSize: fs,
+                  fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+                  fontWeight: 500,
+                  letterSpacing: '0.15px',
+                  lineHeight: 1.35,
+                  color: isAgentActive ? '#fff' : isSelected ? '#e8e8f0' : 'rgba(195,200,220,0.82)',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'break-word',
+                  flex: 1,
+                  minWidth: 0,
                 }}>
                   {tile.name}
                 </span>
