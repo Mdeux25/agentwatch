@@ -1,0 +1,105 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGrad" cx="35%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#1c1c2a"/>
+      <stop offset="100%" stop-color="#0d0d15"/>
+    </radialGradient>
+    <radialGradient id="agentGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fb923c" stop-opacity="0.55"/>
+      <stop offset="60%" stop-color="#f97316" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="dotGrad" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="45%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="tileGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <clipPath id="roundedApp">
+      <rect width="1024" height="1024" rx="196"/>
+    </clipPath>
+  </defs>
+
+  <!-- App background -->
+  <rect width="1024" height="1024" rx="196" fill="url(#bgGrad)"/>
+
+  <!-- Subtle grid lines (background depth) -->
+  <line x1="560" y1="60" x2="560" y2="964" stroke="#ffffff" stroke-opacity="0.025" stroke-width="1"/>
+  <line x1="60" y1="548" x2="964" y2="548" stroke="#ffffff" stroke-opacity="0.025" stroke-width="1"/>
+
+  <!-- ── Treemap tiles ────────────────────────────────────── -->
+
+  <!-- Top-left large directory -->
+  <rect x="60" y="60" width="478" height="468" rx="18" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <!-- accent bars (files inside) -->
+  <rect x="70" y="70" width="5" height="96" rx="2.5" fill="#3b82f6"/>
+  <rect x="70" y="178" width="5" height="72" rx="2.5" fill="#818cf8"/>
+  <rect x="70" y="262" width="5" height="58" rx="2.5" fill="#eab308" opacity="0.8"/>
+  <rect x="70" y="332" width="5" height="48" rx="2.5" fill="#06b6d4" opacity="0.7"/>
+  <rect x="180" y="70" width="5" height="80" rx="2.5" fill="#4ade80" opacity="0.7"/>
+  <rect x="290" y="70" width="5" height="64" rx="2.5" fill="#818cf8" opacity="0.8"/>
+
+  <!-- Top-right directory -->
+  <rect x="558" y="60" width="406" height="214" rx="18" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="568" y="70" width="5" height="72" rx="2.5" fill="#f97316"/>
+  <rect x="668" y="70" width="5" height="58" rx="2.5" fill="#3b82f6" opacity="0.8"/>
+
+  <!-- Right mid tiles -->
+  <rect x="558" y="294" width="192" height="234" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="568" y="304" width="4" height="58" rx="2" fill="#06b6d4"/>
+
+  <rect x="770" y="294" width="194" height="234" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="780" y="304" width="4" height="58" rx="2" fill="#4ade80" opacity="0.85"/>
+
+  <!-- Bottom-left tiles -->
+  <rect x="60" y="548" width="224" height="190" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="70" y="558" width="4" height="52" rx="2" fill="#f97316"/>
+
+  <rect x="304" y="548" width="234" height="190" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="314" y="558" width="4" height="52" rx="2" fill="#818cf8"/>
+
+  <!-- Bottom-right large tile -->
+  <rect x="558" y="548" width="406" height="190" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="568" y="558" width="4" height="52" rx="2" fill="#3b82f6"/>
+  <rect x="668" y="558" width="4" height="52" rx="2" fill="#eab308" opacity="0.8"/>
+
+  <!-- Bottom row -->
+  <rect x="60" y="758" width="310" height="206" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="70" y="768" width="4" height="56" rx="2" fill="#eab308"/>
+
+  <rect x="390" y="758" width="224" height="206" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="400" y="768" width="4" height="56" rx="2" fill="#f97316" opacity="0.9"/>
+
+  <rect x="634" y="758" width="330" height="206" rx="16" fill="#16161f" stroke="#2a2a3a" stroke-width="1.5"/>
+  <rect x="644" y="768" width="4" height="56" rx="2" fill="#06b6d4"/>
+
+  <!-- ── Agent presence on top-left tile ──────────────────── -->
+
+  <!-- Outer glow aura -->
+  <circle cx="299" cy="294" r="148" fill="url(#agentGlow)"/>
+
+  <!-- Ping rings -->
+  <circle cx="299" cy="294" r="90" fill="none" stroke="#f97316" stroke-width="1.5" stroke-opacity="0.18"/>
+  <circle cx="299" cy="294" r="66" fill="none" stroke="#f97316" stroke-width="2"   stroke-opacity="0.32"/>
+  <circle cx="299" cy="294" r="46" fill="none" stroke="#f97316" stroke-width="2.5" stroke-opacity="0.50"/>
+
+  <!-- Agent dot with glow filter -->
+  <circle cx="299" cy="294" r="26" fill="#f97316" filter="url(#softGlow)" opacity="0.6"/>
+  <circle cx="299" cy="294" r="24" fill="url(#dotGrad)"/>
+  <!-- Inner specular highlight -->
+  <ellipse cx="293" cy="287" rx="9" ry="7" fill="#fde68a" opacity="0.55"/>
+
+</svg>
