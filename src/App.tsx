@@ -249,6 +249,8 @@ export default function App() {
   const [explorerZoom, setExplorerZoom] = useState(100)
   const MIN_ZOOM = 50
   const MAX_ZOOM = 200
+  const [explorerNavStack, setExplorerNavStack] = useState<Array<{ id: string; name: string }>>([])
+  const explorerId = explorerNavStack.length > 0 ? explorerNavStack[explorerNavStack.length - 1].name : null
 
   // Drag resize refs
   const draggingRef = useRef<null | { type: 'scene' | 'chat' | 'bottom'; start: number; startVal: number }>(null)
@@ -641,8 +643,19 @@ export default function App() {
               <>
                 {/* Scene panel header */}
                 <div className="ide-panel-header" style={{ background: '#2a2a2b' }}>
-                  <span className="ide-panel-title">Explorer</span>
+                  <span className="ide-panel-title" style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {explorerId ?? 'Explorer'}
+                  </span>
                   <div className="ide-panel-actions">
+                    {/* Back button — leftmost, only when scoped */}
+                    {explorerNavStack.length > 0 && (
+                      <button
+                        className="ide-icon-btn"
+                        onClick={() => setExplorerNavStack(s => s.slice(0, -1))}
+                        title={explorerNavStack.length > 1 ? `Back to ${explorerNavStack[explorerNavStack.length - 2].name}` : 'Back to root'}
+                        style={{ fontSize: 13, fontWeight: 700, paddingRight: 6, gap: 4 }}
+                      >← {explorerNavStack.length > 1 ? explorerNavStack[explorerNavStack.length - 2].name : '~'}</button>
+                    )}
                     {/* Zoom controls */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <button
@@ -701,7 +714,11 @@ export default function App() {
 
                 {/* File explorer */}
                 <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                  <FileExplorer2D zoom={explorerZoom} />
+                  <FileExplorer2D
+                    zoom={explorerZoom}
+                    navStack={explorerNavStack}
+                    onDrillDown={(id, name) => setExplorerNavStack(s => [...s, { id, name }])}
+                  />
                 </div>
               </>
             )}

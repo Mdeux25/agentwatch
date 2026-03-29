@@ -136,9 +136,15 @@ function buildTile(id: string, rect: R, nodes: Record<string, any>, depth: numbe
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-interface Props { zoom: number }
+interface NavEntry { id: string; name: string }
 
-export function FileExplorer2D({ zoom }: Props) {
+interface Props {
+  zoom: number
+  navStack: NavEntry[]
+  onDrillDown: (id: string, name: string) => void
+}
+
+export function FileExplorer2D({ zoom, navStack, onDrillDown }: Props) {
   const quadNodes       = useStore(s => s.quadNodes)
   const searchQuery     = useStore(s => s.searchQuery)
   const activeFileId    = useStore(s => s.activeFileId)
@@ -152,12 +158,18 @@ export function FileExplorer2D({ zoom }: Props) {
     [agentSpheres],
   )
 
+  // Current scope: drill into a folder or show root
+  const currentRootId = navStack.length > 0 ? navStack[navStack.length - 1].id : '__root__'
+
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize]       = useState({ w: 400, h: 400 })
   const [pan, setPan]         = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragRef  = useRef<{ sx: number; sy: number; px: number; py: number } | null>(null)
   const hasMoved = useRef(false)
+
+  // Reset pan whenever the user drills in or back
+  useEffect(() => { setPan({ x: 0, y: 0 }) }, [currentRootId])
 
   // Track container size via ResizeObserver
   useEffect(() => {
@@ -192,13 +204,13 @@ export function FileExplorer2D({ zoom }: Props) {
     return ids
   }, [quadNodes])
 
-  // Build tile tree whenever nodes or panel size change
+  // Build tile tree from current scope root
   const flatTiles = useMemo<Tile[]>(() => {
     const nodes = quadNodes
-    const root  = nodes['__root__']
-    if (!root || root.childIds.length === 0) return []
+    const scopeNode = nodes[currentRootId]
+    if (!scopeNode || (scopeNode.childIds as string[]).length === 0) return []
 
-    const topItems = (root.childIds as string[])
+    const topItems = (scopeNode.childIds as string[])
       .filter(id => nodes[id])
       .map(id => ({ key: id, weight: fileCount(id, nodes) }))
 
@@ -209,7 +221,7 @@ export function FileExplorer2D({ zoom }: Props) {
       buildTile(id, r, nodes, 0)
     )
 
-    // Flatten: directories shallowest-first, then files
+    // Flatten: directories shallowest-first, then files on top
     const dirs: Tile[] = [], files: Tile[] = []
     function flatten(t: Tile) {
       if (t.kind === 'directory') dirs.push(t); else files.push(t)
@@ -218,7 +230,7 @@ export function FileExplorer2D({ zoom }: Props) {
     topTiles.forEach(flatten)
     dirs.sort((a, b) => a.depth - b.depth)
     return [...dirs, ...files]
-  }, [quadNodes, tmW, tmH])
+  }, [quadNodes, tmW, tmH, currentRootId])
 
   const onMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return
@@ -235,7 +247,7 @@ export function FileExplorer2D({ zoom }: Props) {
   }
   const onMouseUp = () => { dragRef.current = null; setIsDragging(false) }
 
-  if (!quadNodes['__root__']) {
+  if (!quadNodes['__root__'] && navStack.length === 0) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace', fontSize: 12 }}>
         <span style={{ fontSize: 24 }}>◻</span>
@@ -268,6 +280,7 @@ export function FileExplorer2D({ zoom }: Props) {
           if (tile.kind === 'directory') {
             const showLabel = w > 22 && h > 12
             const fs = Math.min(11, Math.max(8, Math.min(w * 0.1, 11)))
+            const labelH = showLabel ? Math.min(HDR, h) : 0
             return (
               <div key={tile.id} style={{
                 position: 'absolute', left: x, top: y, width: w, height: h,
@@ -275,19 +288,32 @@ export function FileExplorer2D({ zoom }: Props) {
                 borderRadius: 3,
                 background: 'rgba(255,153,0,0.05)',
                 boxSizing: 'border-box',
-                pointerEvents: 'none',
                 overflow: 'hidden',
+                pointerEvents: 'none',   // outer box: passthrough for drag
               }}>
                 {showLabel && (
-                  <span style={{
-                    position: 'absolute', top: 1, left: 4,
-                    fontSize: fs, color: 'rgba(255,224,160,0.8)',
-                    fontFamily: 'JetBrains Mono, monospace',
-                    whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: w - 8,
-                    lineHeight: 1.3, pointerEvents: 'none',
-                  }}>
-                    {tile.name}
-                  </span>
+                  // Label strip is the clickable drill-down target
+                  <div
+                    onClick={(e) => { e.stopPropagation(); if (!hasMoved.current) onDrillDown(tile.id, tile.name) }}
+                    style={{
+                      position: 'absolute', top: 0, left: 0, right: 0, height: labelH,
+                      display: 'flex', alignItems: 'center', paddingLeft: 4,
+                      cursor: 'pointer',
+                      pointerEvents: 'all',
+                      borderRadius: '3px 3px 0 0',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,153,0,0.15)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '')}
+                  >
+                    <span style={{
+                      fontSize: fs, color: 'rgba(255,224,160,0.9)',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: w - 8,
+                      lineHeight: 1.3,
+                    }}>
+                      {tile.name}
+                    </span>
+                  </div>
                 )}
               </div>
             )
