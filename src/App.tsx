@@ -5,11 +5,12 @@ import { ChatInput } from './components/ChatInput'
 import { FileExplorer2D } from './components/scene/FileExplorer2D'
 import { RenderErrorBoundary } from './components/scene/RenderErrorBoundary'
 import { useStore } from './store/useStore'
-import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull, saveContextFiles, generateFileSummary } from './lib/tauri'
+import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull, saveContextFiles, generateFileSummary, checkClaudeInstalled } from './lib/tauri'
 import { generateContextMd, wrapSummaryHtml } from './lib/metaFileGen'
 import { CodeEditorPanel } from './components/CodeEditorPanel'
 import { AvatarDot } from './components/AvatarDot'
 import { WelcomeModal } from './components/WelcomeModal'
+import { SetupGuide } from './components/SetupGuide'
 import { buildEditDiff, DiffLines } from './lib/diffUtils'
 import { deriveFileHistory, deriveTaskHistory } from './lib/editHistory'
 import { UsagePanel } from './components/UsagePanel'
@@ -472,6 +473,12 @@ export default function App() {
 
   // ── Recent paths + open project ───────────────────────────────────────────
   const [recentPaths] = useState<string[]>(getRecentPaths)
+  const [showSetup, setShowSetup] = useState(false)
+
+  // Check for Claude Code on mount — show setup guide if not installed
+  useEffect(() => {
+    checkClaudeInstalled().then(v => { if (!v) setShowSetup(true) })
+  }, [])
 
   // Ref to track whether we've already sent the auto-summary for this path
   const summarisedPathRef = useRef<string | null>(null)
@@ -555,6 +562,9 @@ export default function App() {
       {!projectRoot && (
         <WelcomeModal recentPaths={recentPaths} onOpen={openProject} />
       )}
+
+      {/* ── Setup guide (shown when Claude Code is not detected) ── */}
+      {showSetup && <SetupGuide onDone={() => setShowSetup(false)} />}
 
       {/* ── Title bar ── */}
       <div className="ide-titlebar">

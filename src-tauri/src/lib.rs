@@ -97,6 +97,33 @@ fn write_file(path: String, content: String) -> Result<(), String> {
 
 // ── Usage tracking ─────────────────────────────────────────────────────────────
 
+// ── Claude Code detection ─────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn check_claude_installed() -> Result<Option<String>, String> {
+    let candidates = [
+        std::env::var("HOME").unwrap_or_default() + "/.local/bin/claude",
+        "/usr/local/bin/claude".to_string(),
+        "/opt/homebrew/bin/claude".to_string(),
+        "/usr/bin/claude".to_string(),
+    ];
+    let binary = candidates.iter().find(|p| std::path::Path::new(p.as_str()).exists())
+        .cloned()
+        .unwrap_or_else(|| "claude".to_string());
+
+    match tokio::process::Command::new(&binary)
+        .arg("--version")
+        .output()
+        .await
+    {
+        Ok(out) if out.status.success() => {
+            let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            Ok(Some(version))
+        }
+        _ => Ok(None),
+    }
+}
+
 #[tauri::command]
 fn append_usage_record(record: String) -> Result<(), String> {
     use std::io::Write;
@@ -242,6 +269,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
+            check_claude_installed,
             claude::process::send_prompt,
             claude::process::stop_session,
             read_file_preview,

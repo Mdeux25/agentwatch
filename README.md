@@ -23,7 +23,7 @@ Most IDEs put AI in a sidebar. AgentWatch flips that — Claude is the primary a
 
 ## Screenshots
 
-<img src="assets/screenshot-1.png" alt="Understand any codebase in seconds" width="100%" />
+<img src="assets/screenshot-main.png" alt="AgentWatch — treemap explorer, file summary, and Claude chat panel" width="100%" />
 
 <table>
   <tr>
@@ -87,7 +87,24 @@ The app runs Claude Code as a subprocess and streams its events (tool use, think
 - **Usage dashboard** — token usage and USD cost tracked per task, per project, per day, monthly, and all-time. Persists to `~/.agentwatch/usage.jsonl` across sessions. Includes a 7-day cost bar chart, per-task input/output token split bars, and a project breakdown donut chart.
 - **File mind map** — force-directed dependency graph of your codebase. Open a file to see it expanded with its direct imports as unexplored (black-box) nodes. Click any black-box to expand it; collapse back with one click. Scan the full project to add all files as nodes at once.
 - **File summaries** — every file you open gets a Claude-generated human-readable summary (symbols, endpoints, notable patterns) rendered in a **Summary** tab. Also writes a compact `.ctx.md` for token-efficient context in future Claude sessions. Both saved to `.agentwatch/context/` (auto-added to `.gitignore`). Summaries regenerate automatically when Claude edits a file.
-- **Architecture Intelligence (ARCH tab)** — LLM-powered architecture panel, default view when opening the map tab. Three progressive phases: **(1) instant** — tech stack detected from file extensions and npm imports, architectural layers grouped from directory structure; **(2) async Claude enrichment** — health status per layer (healthy / review / critical), global design patterns, and insights with shimmer skeletons while loading; **(3) cached** — results persisted to `localStorage` so re-opens are instant. Click any layer card to drill in: each layer gets its own focused Claude call with a per-layer summary, patterns, and insights that cite specific filenames. Context-full errors are handled automatically with 4 truncation levels — large projects always complete without manual intervention.
+- **Architecture Intelligence (ARCH tab)** — LLM-powered architecture panel, default view when opening the map tab. Three progressive phases: **(1) instant** — tech stack detected from file extensions and npm imports, architectural layers grouped from directory structure; **(2) async Claude enrichment** — health status per layer (healthy / review / critical), global design patterns, and insights with shimmer skeletons while loading; **(3) cached** — results persisted to `localStorage` so re-opens are instant. Click any layer card to drill in: each layer gets its own focused Claude call with a per-layer summary, patterns, and insights that cite specific filenames. Context-full errors are handled automatically with 4 truncation levels — large projects always complete without manual intervention. *(see screenshots below)*
+
+---
+
+## Screenshots
+
+<img src="assets/screenshot-intro.png" alt="AgentWatch welcome screen" width="100%" />
+
+<table>
+  <tr>
+    <td><img src="assets/screenshot-arch.png" alt="Architecture Intelligence panel" /></td>
+    <td><img src="assets/screenshot-arch-layer.png" alt="Layer drill-down with health status" /></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Architecture Intelligence — layer health at a glance</em></td>
+    <td align="center"><em>Drill into any layer for a focused Claude analysis</em></td>
+  </tr>
+</table>
 
 ---
 

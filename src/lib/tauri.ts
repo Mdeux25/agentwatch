@@ -2,6 +2,11 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { ClaudeEvent } from '../types/events'
 
+/** Returns version string if Claude Code is installed, null otherwise */
+export async function checkClaudeInstalled(): Promise<string | null> {
+  return invoke<string | null>('check_claude_installed')
+}
+
 export async function openFolderDialog(): Promise<string | null> {
   const result = await invoke<string>('open_folder_dialog')
   return result || null
