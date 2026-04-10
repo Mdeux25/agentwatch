@@ -1,6 +1,9 @@
 mod claude;
+mod codex;
+mod shared;
+mod state;
 
-use claude::AppState;
+use state::AppState;
 
 // ── File preview ──────────────────────────────────────────────────────────────
 
@@ -97,7 +100,7 @@ fn write_file(path: String, content: String) -> Result<(), String> {
 
 // ── Usage tracking ─────────────────────────────────────────────────────────────
 
-// ── Claude Code detection ─────────────────────────────────────────────────────
+// ── Agent detection ──────────────────────────────────────────────────────────
 
 #[tauri::command]
 async fn check_claude_installed() -> Result<Option<String>, String> {
@@ -122,6 +125,52 @@ async fn check_claude_installed() -> Result<Option<String>, String> {
         }
         _ => Ok(None),
     }
+}
+
+#[tauri::command]
+async fn check_codex_installed() -> Result<Option<String>, String> {
+    // Try known paths first
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = [
+        format!("{home}/.npm-global/bin/codex"),
+        format!("{home}/.local/bin/codex"),
+        "/usr/local/bin/codex".to_string(),
+        "/opt/homebrew/bin/codex".to_string(),
+        "/usr/bin/codex".to_string(),
+    ];
+    let binary = candidates.iter()
+        .find(|p| std::path::Path::new(p.as_str()).exists())
+        .cloned()
+        .unwrap_or_else(|| "codex".to_string());
+
+    match tokio::process::Command::new(&binary)
+        .arg("--version")
+        .output()
+        .await
+    {
+        Ok(out) if out.status.success() => {
+            let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            Ok(Some(version))
+        }
+        _ => Ok(None),
+    }
+}
+
+// ── Provider selection ───────────────────────────────────────────────────────
+
+#[tauri::command]
+fn set_provider(provider: String, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let valid = ["claude", "codex"];
+    if !valid.contains(&provider.as_str()) {
+        return Err(format!("Unknown provider: {provider}. Must be one of: {}", valid.join(", ")));
+    }
+    *state.provider.lock().unwrap() = provider;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_provider(state: tauri::State<'_, AppState>) -> String {
+    state.provider.lock().unwrap().clone()
 }
 
 #[tauri::command]
@@ -267,11 +316,16 @@ async fn generate_file_summary(path: String, content: String) -> Result<String, 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(AppState::default())
+        .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             check_claude_installed,
+            check_codex_installed,
             claude::process::send_prompt,
             claude::process::stop_session,
+            codex::process::send_codex_prompt,
+            codex::process::stop_codex_session,
+            set_provider,
+            get_provider,
             read_file_preview,
             scan_directory,
             open_folder_dialog,

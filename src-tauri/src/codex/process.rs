@@ -3,17 +3,18 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
-use super::events::parse_line;
+use super::events::parse_codex_line;
 use crate::shared::{now_ms, FrontendEvent};
 use crate::state::AppState;
 
-fn find_claude() -> Result<std::path::PathBuf, String> {
+fn find_codex() -> Result<std::path::PathBuf, String> {
     let home = std::env::var("HOME").unwrap_or_default();
     let candidates = [
-        format!("{home}/.local/bin/claude"),
-        "/usr/local/bin/claude".to_string(),
-        "/opt/homebrew/bin/claude".to_string(),
-        "/usr/bin/claude".to_string(),
+        format!("{home}/.npm-global/bin/codex"),
+        format!("{home}/.local/bin/codex"),
+        "/usr/local/bin/codex".to_string(),
+        "/opt/homebrew/bin/codex".to_string(),
+        "/usr/bin/codex".to_string(),
     ];
     for path in &candidates {
         let pb = std::path::PathBuf::from(path);
@@ -21,7 +22,16 @@ fn find_claude() -> Result<std::path::PathBuf, String> {
             return Ok(pb);
         }
     }
-    Err("claude CLI not found. Install Claude Code from https://claude.ai/code".to_string())
+    // Fallback: try `which codex`
+    if let Ok(output) = std::process::Command::new("which").arg("codex").output() {
+        if output.status.success() {
+            let p = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !p.is_empty() {
+                return Ok(std::path::PathBuf::from(p));
+            }
+        }
+    }
+    Err("codex CLI not found. Install with: npm install -g @openai/codex".to_string())
 }
 
 fn emit_error(app: &AppHandle, msg: String) {
@@ -40,53 +50,37 @@ fn emit_error(app: &AppHandle, msg: String) {
 }
 
 #[tauri::command]
-pub async fn send_prompt(
+pub async fn send_codex_prompt(
     prompt: String,
-    session_id: Option<String>,
+    _session_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let claude = find_claude()?;
+    let codex = find_codex()?;
     let home = std::env::var("HOME").unwrap_or_default();
 
-    let resume_id = {
-        let lock = state.session_id.lock().unwrap();
-        session_id.or_else(|| lock.clone())
-    };
-
-    let mut cmd = Command::new(&claude);
-    cmd.arg("--print")
+    let mut cmd = Command::new(&codex);
+    cmd.arg("exec")
         .arg(&prompt)
-        .arg("--output-format")
-        .arg("stream-json")
-        .arg("--verbose")
-        .arg("--dangerously-skip-permissions")
-        // Pass full inherited environment plus ensure HOME/PATH are correct
+        .arg("--json")
+        .arg("--full-auto")
         .env("HOME", &home)
         .env(
             "PATH",
-            format!("{home}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"),
+            format!("{home}/.npm-global/bin:{home}/.local/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"),
         )
-        // Claude Code stores auth in ~/.claude — needs XDG / config paths
-        .env("XDG_CONFIG_HOME", format!("{home}/.config"))
-        .env("XDG_DATA_HOME", format!("{home}/.local/share"))
-        // Required for some terminal detection inside claude
         .env("TERM", "xterm-256color")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    if let Some(ref sid) = resume_id {
-        cmd.arg("--resume").arg(sid);
-    }
-
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("Failed to spawn claude: {e}"))?;
+        .map_err(|e| format!("Failed to spawn codex: {e}"))?;
 
     let stdout = child.stdout.take().ok_or("No stdout")?;
     let stderr = child.stderr.take().ok_or("No stderr")?;
 
-    // Read stderr in background and surface it as error events
+    // Read stderr in background
     let app_err = app.clone();
     tokio::spawn(async move {
         let mut lines = BufReader::new(stderr).lines();
@@ -111,7 +105,7 @@ pub async fn send_prompt(
             continue;
         }
 
-        if let Some(event) = parse_line(&line) {
+        if let Some(event) = parse_codex_line(&line) {
             if event.event_type == "session_init" {
                 if let Some(ref sid) = event.session_id {
                     *state.session_id.lock().unwrap() = Some(sid.clone());
@@ -126,14 +120,14 @@ pub async fn send_prompt(
 
     if !status.success() {
         let code = status.code().unwrap_or(-1);
-        emit_error(&app, format!("claude exited with code {code}"));
+        emit_error(&app, format!("codex exited with code {code}"));
     }
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn stop_session(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn stop_codex_session(state: State<'_, AppState>) -> Result<(), String> {
     *state.session_id.lock().unwrap() = None;
     Ok(())
 }

@@ -2,9 +2,17 @@ import type { UsageRecord, UsageAggregate } from '../types/usage'
 
 // Pricing per million tokens
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  // Claude
   'claude-sonnet-4-6': { input: 3, output: 15 },
   'claude-opus-4-6':   { input: 15, output: 75 },
   'claude-haiku-4-5':  { input: 0.8, output: 4 },
+  // OpenAI (Codex models)
+  'o3':                { input: 2, output: 8 },
+  'o4-mini':           { input: 0.4, output: 1.6 },
+  'gpt-4.1':           { input: 2, output: 8 },
+  'gpt-4.1-mini':      { input: 0.4, output: 1.6 },
+  'gpt-4.1-nano':      { input: 0.1, output: 0.4 },
+  'codex-mini':        { input: 0.4, output: 1.6 },
   default:             { input: 3, output: 15 },
 }
 

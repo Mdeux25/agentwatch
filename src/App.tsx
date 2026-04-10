@@ -5,7 +5,7 @@ import { ChatInput } from './components/ChatInput'
 import { FileExplorer2D } from './components/scene/FileExplorer2D'
 import { RenderErrorBoundary } from './components/scene/RenderErrorBoundary'
 import { useStore } from './store/useStore'
-import { sendPrompt, listenForEvents, scanDirectory, getHomeDir, readFileFull, saveContextFiles, generateFileSummary, checkClaudeInstalled } from './lib/tauri'
+import { sendPromptForProvider, listenForEvents, scanDirectory, getHomeDir, readFileFull, saveContextFiles, generateFileSummary, checkClaudeInstalled, checkCodexInstalled } from './lib/tauri'
 import { generateContextMd, wrapSummaryHtml } from './lib/metaFileGen'
 import { CodeEditorPanel } from './components/CodeEditorPanel'
 import { AvatarDot } from './components/AvatarDot'
@@ -327,7 +327,7 @@ export default function App() {
           inputTokens: event.input_tokens,
           outputTokens: event.output_tokens ?? 0,
           costUsd: calcCost(event.input_tokens, event.output_tokens ?? 0),
-          model: 'claude-sonnet-4-6',
+          model: useStore.getState().provider === 'codex' ? 'o4-mini' : 'claude-sonnet-4-6',
         }
         appendUsageRecord(record).catch(console.error)
         addSessionUsageRecord(record)
@@ -437,7 +437,7 @@ export default function App() {
     setProcessing(true)
     setChatContext(null)
     try {
-      await sendPrompt(fullPrompt, sessionId)
+      await sendPromptForProvider(fullPrompt, sessionId, useStore.getState().provider)
     } catch (err) {
       addEvent({ type: 'error', message: err instanceof Error ? err.message : String(err), timestamp: Date.now() })
       setProcessing(false)
@@ -475,9 +475,11 @@ export default function App() {
   const [recentPaths] = useState<string[]>(getRecentPaths)
   const [showSetup, setShowSetup] = useState(false)
 
-  // Check for Claude Code on mount — show setup guide if not installed
+  // Check for any agent on mount — show setup guide if none installed
   useEffect(() => {
-    checkClaudeInstalled().then(v => { if (!v) setShowSetup(true) })
+    Promise.all([checkClaudeInstalled(), checkCodexInstalled()]).then(([claude, codex]) => {
+      if (!claude && !codex) setShowSetup(true)
+    })
   }, [])
 
   // Ref to track whether we've already sent the auto-summary for this path
@@ -513,9 +515,10 @@ export default function App() {
         // Store path so we can cache the response
         pendingSummaryPathRef.current = path
         const fileListPreview = relPaths.slice(0, 300).join('\n')
-        await sendPrompt(
+        await sendPromptForProvider(
           `You are analysing a code repository. Based on the file list below, write a concise 3–5 sentence overview: what is this project, what is the main tech stack, and what are the key directories/components? Be direct and concrete.\n\nRoot: ${path}\n\nFiles (${paths.length} total):\n${fileListPreview}`,
           null,
+          useStore.getState().provider,
         )
       } else {
         setProcessing(false)
@@ -564,7 +567,7 @@ export default function App() {
       )}
 
       {/* ── Setup guide (shown when Claude Code is not detected) ── */}
-      {showSetup && <SetupGuide onDone={() => setShowSetup(false)} />}
+      {showSetup && <SetupGuide onDone={(provider) => { setShowSetup(false); if (provider) useStore.getState().setProvider(provider) }} />}
 
       {/* ── Title bar ── */}
       <div className="ide-titlebar">

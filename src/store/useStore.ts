@@ -9,6 +9,7 @@ import type {
 } from '../types/events'
 import type { UsageRecord } from '../types/usage'
 import type { MindMapData } from '../types/mindMap'
+import type { AgentProvider } from '../types/provider'
 import { buildFileMapDelta } from '../lib/mindMapBuilder'
 import {
   ROOT_ID,
@@ -175,6 +176,9 @@ function processQuadTree(
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 interface AppStore {
+  // ── Provider ──
+  provider: AgentProvider
+  setProvider: (p: AgentProvider) => void
   // ── Chat ──
   events: ClaudeEvent[]
   sessionId: string | null
@@ -243,6 +247,8 @@ const SCENE_INITIAL = {
 }
 
 export const useStore = create<AppStore>((set) => ({
+  provider: 'claude' as AgentProvider,
+  setProvider: (p: AgentProvider) => set({ provider: p }),
   events: [],
   sessionId: null,
   isProcessing: false,
